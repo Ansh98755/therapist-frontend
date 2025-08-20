@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/core/screens/post_details_screen.dart';
+import 'package:therapist_app/screens/post_details_screen.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class CommunityPost {

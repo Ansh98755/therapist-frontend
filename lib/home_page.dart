@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/core/screens/analytics_Screen.dart';
-import 'package:therapist_app/core/screens/community_screen.dart';
-import 'package:therapist_app/core/screens/home_screen.dart';
-import 'package:therapist_app/core/screens/profile_screen.dart';
+import 'package:therapist_app/screens/analytics_Screen.dart';
+import 'package:therapist_app/screens/community_screen.dart';
+import 'package:therapist_app/screens/home_screen.dart';
+import 'package:therapist_app/screens/profile_screen.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class HomePage extends StatefulWidget {

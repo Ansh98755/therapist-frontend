@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/core/screens/community_screen.dart';
+import 'package:therapist_app/screens/community_screen.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class PostDetailsScreen extends StatelessWidget {

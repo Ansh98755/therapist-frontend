@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/core/home/home_page.dart';
-import 'package:therapist_app/core/screens/auth_screen.dart';
+import 'package:therapist_app/home_page.dart';
+import 'package:therapist_app/screens/auth_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
