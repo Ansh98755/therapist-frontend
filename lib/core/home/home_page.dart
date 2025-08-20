@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:therapist_app/core/screens/analytics_Screen.dart';
-import 'package:therapist_app/core/screens/appointment_screen.dart';
+import 'package:therapist_app/core/screens/community_screen.dart';
 import 'package:therapist_app/core/screens/home_screen.dart';
 import 'package:therapist_app/core/screens/profile_screen.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
@@ -18,13 +18,14 @@ class _HomePageState extends State<HomePage> {
   final List<Widget> _screens = [
     HomeScreen(),
     AnalyticsScreen(),
-    AppointmentScreen(),
+    CommunityScreen(),
     ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -48,7 +49,7 @@ class _HomePageState extends State<HomePage> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today),
-            label: 'Appointments',
+            label: 'Community',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:therapist_app/routes/routes.dart';
-
 void main() {
   runApp(const MyApp());
 }
@@ -15,7 +14,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      initialRoute: AppRoutes.home,
+      initialRoute: AppRoutes.auth,
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }
