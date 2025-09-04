@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:therapist_app/core/api_service.dart';
+import 'package:therapist_app/core/authservices.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -10,469 +13,953 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedFilter = 'All';
   String searchQuery = '';
   TextEditingController searchController = TextEditingController();
+  final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
 
-  final List<Map<String, dynamic>> bookings = [
-    {
-      'name': 'Nayonika Bisnwas',
-      'profession': 'Therapist',
-      'date': '12 Aug 2025',
-      'time': '12:00',
-      'price': '₹1012',
-      'type': 'Video Meeting',
-      'link': 'https://meet.google.com/pbf-gsmg-oat',
-      'status': 'Booked'
-    },
-    {
-      'name': 'Dr. Rajesh Sharma',
-      'profession': 'Cardiologist',
-      'date': '15 Aug 2025',
-      'time': '14:30',
-      'price': '₹850',
-      'type': 'In-person',
-      'link': 'Clinic Address: 123 Health Street',
-      'status': 'Confirmed'
-    },
-    {
-      'name': 'Sarah Johnson',
-      'profession': 'Physiotherapist',
-      'date': '18 Aug 2025',
-      'time': '10:15',
-      'price': '₹650',
-      'type': 'Video Meeting',
-      'link': 'https://meet.google.com/xyz-abcd-123',
-      'status': 'Pending'
-    },
-    {
-      'name': 'Dr. Priya Mehta',
-      'profession': 'Dermatologist',
-      'date': '20 Aug 2025',
-      'time': '16:45',
-      'price': '₹1200',
-      'type': 'In-person',
-      'link': 'Clinic Address: 456 Skin Care Plaza',
-      'status': 'Booked'
-    },
-    {
-      'name': 'Michael Brown',
-      'profession': 'Nutritionist',
-      'date': '22 Aug 2025',
-      'time': '11:00',
-      'price': '₹500',
-      'type': 'Video Meeting',
-      'link': 'https://meet.google.com/nutrition-call',
-      'status': 'Cancelled'
-    },
-    {
-      'name': 'Dr. Anita Kumar',
-      'profession': 'Psychiatrist',
-      'date': '25 Aug 2025',
-      'time': '13:20',
-      'price': '₹1500',
-      'type': 'Video Meeting',
-      'link': 'https://meet.google.com/mental-health',
-      'status': 'Confirmed'
-    },
-    {
-      'name': 'James Wilson',
-      'profession': 'Fitness Trainer',
-      'date': '28 Aug 2025',
-      'time': '07:00',
-      'price': '₹800',
-      'type': 'In-person',
-      'link': 'Gym Address: 789 Fitness Center',
-      'status': 'Booked'
-    },
-    {
-      'name': 'Dr. Kavita Singh',
-      'profession': 'Pediatrician',
-      'date': '30 Aug 2025',
-      'time': '15:30',
-      'price': '₹750',
-      'type': 'Video Meeting',
-      'link': 'https://meet.google.com/child-care',
-      'status': 'Pending'
-    },
-    {
-      'name': 'Lisa Anderson',
-      'profession': 'Yoga Instructor',
-      'date': '02 Sep 2025',
-      'time': '06:30',
-      'price': '₹400',
-      'type': 'In-person',
-      'link': 'Studio Address: 321 Wellness Center',
-      'status': 'Confirmed'
-    },
-    {
-      'name': 'Dr. Amit Patel',
-      'profession': 'Orthopedic',
-      'date': '05 Sep 2025',
-      'time': '17:15',
-      'price': '₹1100',
-      'type': 'Video Meeting',
-      'link': 'https://meet.google.com/bone-health',
-      'status': 'Booked'
+  List<Map<String, dynamic>> bookings = [];
+  bool isLoading = true;
+  bool isRefreshing = false;
+  String errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookings();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBookings() async {
+    print('Loading bookings...');
+
+    final isLoggedIn = await _authService.isLoggedIn();
+    if (!isLoggedIn) {
+      print('User not logged in, cannot load bookings');
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Please login to view bookings';
+      });
+      return;
     }
-  ];
+
+    // Check if we have therapist ID
+    final therapistId = await _authService.getTherapistId();
+    print('Current therapist ID: $therapistId');
+    
+    if (therapistId == null) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Therapist ID not found. Please login again.';
+      });
+      return;
+    }
+
+    await fetchBookingsData();
+  }
+
+  Future<void> fetchBookingsData() async {
+    if (isRefreshing) {
+      print('Already refreshing, skipping request');
+      return;
+    }
+
+    setState(() {
+      if (!isLoading) isRefreshing = true;
+      isLoading = true;
+      errorMessage = '';
+    });
+
+    try {
+      print('Fetching bookings data...');
+      
+      // Get current therapist ID to verify
+      final therapistId = await _authService.getTherapistId();
+      print('Using therapist ID: $therapistId');
+      
+      if (therapistId == null) {
+        setState(() {
+          isLoading = false;
+          isRefreshing = false;
+          errorMessage = 'Therapist ID not found. Please login again.';
+        });
+        return;
+      }
+
+      final result = await _apiService.getBookings();
+
+      print('Bookings API result: $result');
+
+      if (result['success'] == true) {
+        List<Map<String, dynamic>> fetchedBookings = [];
+
+        // Handle the actual API response structure from your logs
+        dynamic responseData = result['data'];
+        
+        if (responseData is Map<String, dynamic>) {
+          // Extract the data array from the API response
+          dynamic bookingsArray = responseData['data'];
+          
+          if (bookingsArray is List) {
+            for (var booking in bookingsArray) {
+              if (booking is Map<String, dynamic>) {
+                // Parse customer information
+                String clientName = 'Unknown Client';
+                String clientId = '';
+                
+                if (booking['customerId'] is Map<String, dynamic>) {
+                  final customer = booking['customerId'] as Map<String, dynamic>;
+                  clientName = customer['fullName'] ?? 'Unknown Client';
+                  clientId = customer['_id'] ?? '';
+                }
+
+                // Format date and time
+                String formattedDate = 'No Date';
+                String formattedTime = 'No Time';
+                
+                if (booking['meetDate'] != null) {
+                  try {
+                    final meetDate = DateTime.parse(booking['meetDate']);
+                    formattedDate = '${meetDate.day}/${meetDate.month}/${meetDate.year}';
+                  } catch (e) {
+                    print('Date parsing error: $e');
+                  }
+                }
+                
+                if (booking['meetTime'] != null) {
+                  formattedTime = booking['meetTime'];
+                }
+
+                fetchedBookings.add({
+                  'id': booking['_id'] ?? '',
+                  'clientName': clientName,
+                  'clientId': clientId,
+                  'date': formattedDate,
+                  'time': formattedTime,
+                  'price': '500', // Default price since it's not in the response
+                  'type': booking['finished'] == true ? 'Completed' : 'Consultation',
+                  'link': booking['meetLink'] ?? '',
+                  'status': booking['meetStatus'] ?? 'Unknown',
+                  'finished': booking['finished'] ?? false,
+                  'meetingId': booking['_id'] ?? '',
+                  'meetDate': booking['meetDate'],
+                  'createdAt': booking['createdAt'],
+                });
+              }
+            }
+          }
+        }
+
+        print('Processed ${fetchedBookings.length} bookings');
+
+        setState(() {
+          bookings = fetchedBookings;
+          isLoading = false;
+          isRefreshing = false;
+        });
+      } else {
+        print('API returned error: ${result['error']}');
+        setState(() {
+          bookings = [];
+          isLoading = false;
+          isRefreshing = false;
+          if (result['code'] == 401) {
+            errorMessage = 'Session expired. Please login again.';
+          } else {
+            errorMessage = result['error'] ?? 'Failed to load bookings';
+          }
+        });
+      }
+    } catch (e) {
+      print('Exception while fetching bookings: $e');
+      setState(() {
+        isLoading = false;
+        isRefreshing = false;
+        errorMessage = 'Failed to load bookings: $e';
+      });
+    }
+  }
+
+  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
+    try {
+      final result = await _apiService.cancelBooking(booking['id']);
+
+      if (result['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Booking cancelled successfully'),
+              backgroundColor: ColorConstants.color2E7D7D,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+        // Refresh the bookings list
+        await fetchBookingsData();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Failed to cancel booking'),
+              backgroundColor: ColorConstants.redColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel booking'),
+            backgroundColor: ColorConstants.redColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
 
   List<Map<String, dynamic>> getFilteredBookings() {
     List<Map<String, dynamic>> filtered = bookings;
-    
+
     if (selectedFilter != 'All') {
-      filtered = filtered.where((booking) => booking['status'] == selectedFilter).toList();
+      filtered = filtered
+          .where(
+            (booking) =>
+                booking['status'].toString().toLowerCase() ==
+                selectedFilter.toLowerCase(),
+          )
+          .toList();
     }
-    
+
     if (searchQuery.isNotEmpty) {
-      filtered = filtered.where((booking) => 
-        booking['name'].toLowerCase().contains(searchQuery.toLowerCase()) ||
-        booking['profession'].toLowerCase().contains(searchQuery.toLowerCase())
-      ).toList();
+      filtered = filtered
+          .where(
+            (booking) =>
+                booking['clientName'].toString().toLowerCase().contains(
+                  searchQuery.toLowerCase(),
+                ) ||
+                booking['type'].toString().toLowerCase().contains(
+                  searchQuery.toLowerCase(),
+                ),
+          )
+          .toList();
     }
-    
+
     return filtered;
   }
 
   Color getStatusColor(String status) {
-    switch (status) {
-      case 'Booked':
-        return Colors.green.shade100;
-      case 'Confirmed':
-        return Colors.blue.shade100;
-      case 'Pending':
-        return Colors.orange.shade100;
-      case 'Cancelled':
-        return Colors.red.shade100;
+    switch (status.toLowerCase()) {
+      case 'booked':
+        return ColorConstants.colorB2E5D1;
+      case 'confirmed':
+        return ColorConstants.blueColor.withOpacity(0.1);
+      case 'pending':
+        return ColorConstants.primaryOrangeColor.withOpacity(0.1);
+      case 'cancelled':
+        return ColorConstants.redColor.withOpacity(0.1);
+      case 'completed':
+        return ColorConstants.colorEFE5DA;
       default:
-        return Colors.grey.shade100;
+        return ColorConstants.grey3;
     }
   }
 
   Color getStatusTextColor(String status) {
-    switch (status) {
-      case 'Booked':
-        return Colors.green.shade700;
-      case 'Confirmed':
-        return Colors.blue.shade700;
-      case 'Pending':
-        return Colors.orange.shade700;
-      case 'Cancelled':
-        return Colors.red.shade700;
+    switch (status.toLowerCase()) {
+      case 'booked':
+        return ColorConstants.color2E7D7D;
+      case 'confirmed':
+        return ColorConstants.blueColor;
+      case 'pending':
+        return ColorConstants.primaryOrangeColor;
+      case 'cancelled':
+        return ColorConstants.redColor;
+      case 'completed':
+        return ColorConstants.primaryBrownColor;
       default:
-        return Colors.grey.shade700;
+        return ColorConstants.color999999;
+    }
+  }
+
+  void _showBookingOptions(Map<String, dynamic> booking) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ColorConstants.transparentColor,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: ColorConstants.whiteColor,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ColorConstants.grey2,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              booking['clientName'],
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ColorConstants.primaryBrownColor,
+              ),
+            ),
+            SizedBox(height: 20),
+            _buildBottomSheetOption(
+              Icons.info_outline,
+              'View Details',
+              ColorConstants.blueColor,
+              () {
+                Navigator.pop(context);
+                _showBookingDetails(booking);
+              },
+            ),
+            if (booking['link']?.toString().isNotEmpty == true)
+              _buildBottomSheetOption(
+                Icons.videocam,
+                'Join Meeting',
+                ColorConstants.color2E7D7D,
+                () {
+                  Navigator.pop(context);
+                  _copyLink(booking['link']);
+                },
+              ),
+            if (booking['status'].toString().toLowerCase() != 'cancelled' &&
+                booking['status'].toString().toLowerCase() != 'completed')
+              _buildBottomSheetOption(
+                Icons.cancel_outlined,
+                'Cancel Booking',
+                ColorConstants.redColor,
+                () {
+                  Navigator.pop(context);
+                  _confirmCancelBooking(booking);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomSheetOption(
+    IconData icon,
+    String title,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(title),
+      onTap: onTap,
+    );
+  }
+
+  void _showBookingDetails(Map<String, dynamic> booking) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Booking Details',
+          style: TextStyle(color: ColorConstants.primaryBrownColor),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('Client', booking['clientName']),
+            _buildDetailRow('Date', booking['date']),
+            _buildDetailRow('Time', booking['time']),
+            _buildDetailRow('Price', '₹${booking['price']}'),
+            _buildDetailRow('Type', booking['type']),
+            _buildDetailRow('Status', booking['status']),
+            if (booking['link']?.toString().isNotEmpty == true)
+              _buildDetailRow('Meeting Link', booking['link'], isSelectable: true),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: TextStyle(color: ColorConstants.primaryBrownColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {bool isSelectable = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.color999999,
+              ),
+            ),
+          ),
+          Expanded(
+            child: isSelectable 
+              ? SelectableText(
+                  value,
+                  style: TextStyle(color: ColorConstants.blackColor),
+                )
+              : Text(
+                  value,
+                  style: TextStyle(color: ColorConstants.blackColor),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyLink(String link) async {
+    await Clipboard.setData(ClipboardData(text: link));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Meeting link copied to clipboard'),
+          backgroundColor: ColorConstants.color2E7D7D,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _confirmCancelBooking(Map<String, dynamic> booking) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Cancel Booking',
+          style: TextStyle(color: ColorConstants.primaryBrownColor),
+        ),
+        content: Text(
+          'Are you sure you want to cancel this booking with ${booking['clientName']}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'No',
+              style: TextStyle(color: ColorConstants.color999999),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelBooking(booking);
+            },
+            child: Text(
+              'Yes, Cancel',
+              style: TextStyle(color: ColorConstants.redColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    try {
+      print('Logging out...');
+      
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Dialog(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      ColorConstants.primaryBrownColor,
+                    ),
+                  ),
+                  SizedBox(width: 20),
+                  Text("Logging out..."),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      // Clear auth data
+      await _authService.clearAuthData();
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Navigate to auth screen and clear the entire navigation stack
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/auth',
+        (Route<dynamic> route) => false,
+      );
+      
+    } catch (e) {
+      print('Error during logout: $e');
+      
+      // Close loading dialog if it's open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error during logout. Please try again.'),
+            backgroundColor: ColorConstants.redColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    List<Map<String, dynamic>> filteredBookings = getFilteredBookings();
+    final filteredBookings = getFilteredBookings();
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: ColorConstants.boxShadowOrangeOpacity,
-        elevation: 0,
-        
-        title: Text(
-          'My Bookings',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      backgroundColor: ColorConstants.colorF5F5F5,
+      appBar: _buildAppBar(),
       body: Column(
         children: [
-          Container(
-            color: Colors.white,
-            padding: EdgeInsets.all(16),
-            child: Column(
+          _buildSearchAndFilter(),
+          Expanded(child: _buildBookingsList(filteredBookings)),
+        ],
+      ),
+    );
+  }
+
+  AppBar _buildAppBar() {
+    return AppBar(
+      automaticallyImplyLeading: false,
+      backgroundColor: ColorConstants.whiteColor,
+      elevation: 0,
+      title: Text(
+        'My Bookings',
+        style: TextStyle(
+          color: ColorConstants.blackColor,
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.refresh, color: ColorConstants.blackColor),
+          onPressed: () => fetchBookingsData(),
+        ),
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: ColorConstants.blackColor),
+          onSelected: (value) {
+            if (value == 'logout') _logout();
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(value: 'logout', child: Text('Logout')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchAndFilter() {
+    return Container(
+      color: ColorConstants.whiteColor,
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search clients or booking type...',
+              prefixIcon: Icon(Icons.search, color: ColorConstants.grey),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: ColorConstants.grey2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: ColorConstants.grey2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: ColorConstants.primaryBrownColor),
+              ),
+              filled: true,
+              fillColor: ColorConstants.grey3,
+            ),
+            onChanged: (value) => setState(() => searchQuery = value),
+          ),
+          SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
               children: [
-                TextField(
-                  controller: searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search bookings...',
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.brown.shade300),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
+                'All',
+                'Booked',
+                'Confirmed',
+                'Pending',
+                'Cancelled',
+                'Completed',
+              ].map((filter) => _buildFilterChip(filter)).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String filter) {
+    bool isSelected = selectedFilter == filter;
+    return Padding(
+      padding: EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(filter),
+        selected: isSelected,
+        onSelected: (selected) => setState(() => selectedFilter = filter),
+        selectedColor: ColorConstants.colorE6DBCF,
+        checkmarkColor: ColorConstants.primaryBrownColor,
+        labelStyle: TextStyle(
+          color: isSelected
+              ? ColorConstants.primaryBrownColor
+              : ColorConstants.color999999,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookingsList(List<Map<String, dynamic>> filteredBookings) {
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                ColorConstants.primaryBrownColor,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Loading your bookings...',
+              style: TextStyle(color: ColorConstants.color999999, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (errorMessage.isNotEmpty) {
+      return _buildErrorWidget();
+    }
+
+    if (filteredBookings.isEmpty) {
+      return _buildEmptyWidget();
+    }
+
+    return RefreshIndicator(
+      onRefresh: fetchBookingsData,
+      color: ColorConstants.primaryBrownColor,
+      child: ListView.builder(
+        physics: AlwaysScrollableScrollPhysics(),
+        itemCount: filteredBookings.length,
+        itemBuilder: (context, index) =>
+            _buildBookingCard(filteredBookings[index]),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: ColorConstants.redColor.withOpacity(0.7),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Something went wrong',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ColorConstants.primaryBrownColor,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: ColorConstants.color999999),
+            ),
+            SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: fetchBookingsData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primaryBrownColor,
+                    foregroundColor: ColorConstants.whiteColor,
                   ),
-                  onChanged: (value) {
-                    setState(() {
-                      searchQuery = value;
-                    });
-                  },
+                  child: Text('Try Again'),
                 ),
-                SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: ['All', 'Booked', 'Confirmed', 'Pending', 'Cancelled'].map((filter) {
-                      bool isSelected = selectedFilter == filter;
-                      return Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(filter),
-                          selected: isSelected,
-                          onSelected: (bool selected) {
-                            setState(() {
-                              selectedFilter = filter;
-                            });
-                          },
-                          selectedColor: Colors.brown.shade100,
-                          checkmarkColor: Colors.brown.shade700,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.brown.shade700 : Colors.grey.shade700,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                SizedBox(width: 16),
+                TextButton(
+                  onPressed: _logout,
+                  child: Text(
+                    'Logout',
+                    style: TextStyle(color: ColorConstants.redColor),
                   ),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: filteredBookings.length,
-              itemBuilder: (context, index) {
-                final booking = filteredBookings[index];
-                return Container(
-                  margin: EdgeInsets.only(bottom: 16),
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  booking['name'],
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  booking['profession'],
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: getStatusColor(booking['status']),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  booking['status'],
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: getStatusTextColor(booking['status']),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Icon(Icons.more_vert, color: Colors.grey),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                          SizedBox(width: 8),
-                          Text(
-                            booking['date'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
-                          SizedBox(width: 8),
-                          Text(
-                            booking['time'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.currency_rupee, size: 16, color: Colors.grey.shade600),
-                          Text(
-                            booking['price'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            booking['type'] == 'Video Meeting' ? Icons.videocam : Icons.location_on,
-                            size: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            booking['type'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.link, size: 16, color: Colors.blue.shade400),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              booking['link'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.shade400,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.copy, size: 14, color: Colors.grey.shade700),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Copy',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.brown.shade600,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.schedule, color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Reschedule',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Container(
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade600,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.videocam, color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Join',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyWidget() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.calendar_today,
+              size: 64,
+              color: ColorConstants.color999999,
             ),
+            SizedBox(height: 16),
+            Text(
+              'No bookings found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ColorConstants.primaryBrownColor,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              selectedFilter == 'All'
+                  ? 'Your bookings will appear here when clients book sessions'
+                  : 'No bookings found for "$selectedFilter" status',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: ColorConstants.color999999),
+            ),
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: fetchBookingsData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorConstants.primaryBrownColor,
+                foregroundColor: ColorConstants.whiteColor,
+              ),
+              child: Text('Refresh'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(Map<String, dynamic> booking) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: ColorConstants.whiteColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.colorBlack12,
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
         ],
+      ),
+      child: Material(
+        color: ColorConstants.transparentColor,
+        child: InkWell(
+          onTap: () => _showBookingOptions(booking),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        booking['clientName'].toString(),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: ColorConstants.primaryBrownColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: getStatusColor(booking['status'].toString()),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        booking['status'].toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: getStatusTextColor(
+                            booking['status'].toString(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: ColorConstants.color999999,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      booking['date'].toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ColorConstants.color999999,
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: ColorConstants.color999999,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      booking['time'].toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ColorConstants.color999999,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.category,
+                      size: 16,
+                      color: ColorConstants.color999999,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      booking['type'].toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ColorConstants.color999999,
+                      ),
+                    ),
+                    Spacer(),
+                    Text(
+                      '₹${booking['price']}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: ColorConstants.color2E7D7D,
+                      ),
+                    ),
+                  ],
+                ),
+                if (booking['link']?.toString().isNotEmpty == true)
+                  Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _copyLink(booking['link']),
+                      icon: Icon(
+                        Icons.link,
+                        size: 16,
+                        color: ColorConstants.color2E7D7D,
+                      ),
+                      label: Text(
+                        'Copy Meeting Link',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: ColorConstants.color2E7D7D,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: ColorConstants.color2E7D7D),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
