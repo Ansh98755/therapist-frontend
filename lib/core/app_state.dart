@@ -7,8 +7,6 @@ class AppState {
   AppState._internal();
 
   final AuthService _authService = AuthService();
-
-  // Stream controllers for different data types
   final StreamController<Map<String, dynamic>?> _userDataController =
       StreamController<Map<String, dynamic>?>.broadcast();
   final StreamController<List<Map<String, dynamic>>> _bookingsController =
@@ -35,7 +33,7 @@ class AppState {
   Future<void> initialize() async {
     try {
       print('Initializing AppState...');
-      
+     
       // Load cached user data
       _cachedUserData = await _authService.getUserData();
       if (_cachedUserData != null) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
+import 'package:therapist_app/screens/profileedit.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -11,7 +12,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
-  
+
   Map<String, dynamic>? profileData;
   bool isLoading = true;
   String errorMessage = '';
@@ -29,44 +30,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      print('Loading profile data...');
+      print('=== LOADING PROFILE DATA ===');
 
-      // Try to get therapist profile using getTherapistById
+      // Debug current auth state
+      await _authService.debugUserData();
+
+      // Get therapist profile using getTherapistById
       final result = await _apiService.getTherapistById();
-      
-      print('Profile API result: $result');
 
-      if (result['success'] == true) {
+      print('=== API RESULT ===');
+      print('Success: ${result['success']}');
+      print('Result keys: ${result.keys}');
+      print('Full result: $result');
+
+      if (result['success'] == true && result['data'] != null) {
+        final responseData = result['data'];
+        print('Response data type: ${responseData.runtimeType}');
+        print('Response data: $responseData');
+
+        Map<String, dynamic> extractedData = {};
+
+        if (responseData is Map<String, dynamic>) {
+          extractedData = Map<String, dynamic>.from(responseData);
+        } else {
+          throw Exception('Unexpected data format');
+        }
+
+        // Process and normalize the data according to actual API response structure
+        final processedData = _processProfileData(extractedData);
+
         setState(() {
-          profileData = result['data'];
+          profileData = processedData;
           isLoading = false;
         });
-      } else {
-        // If that fails, try getUserProfile as fallback
-        final fallbackResult = await _apiService.getUserProfile();
-        print('Fallback profile result: $fallbackResult');
-        
-        if (fallbackResult['success'] == true) {
-          setState(() {
-            profileData = fallbackResult['data'];
-            isLoading = false;
-          });
-        } else {
-          // As last resort, use cached user data from auth service
-          final cachedData = await _authService.getUserData();
-          if (cachedData != null) {
-            setState(() {
-              profileData = cachedData;
-              isLoading = false;
-            });
-          } else {
-            setState(() {
-              errorMessage = result['error'] ?? 'Failed to load profile data';
-              isLoading = false;
-            });
-          }
-        }
+
+        print('=== FINAL PROFILE DATA ===');
+        print('Profile data keys: ${profileData!.keys}');
+        profileData!.forEach((key, value) {
+          print('$key: $value (${value.runtimeType})');
+        });
+
+        return; // Success, exit method
       }
+
+      print('Primary method failed, trying fallback methods...');
+
+      // Fallback: Use cached user data from auth service
+      final cachedData = await _authService.getUserData();
+      print('Cached user data: $cachedData');
+
+      if (cachedData != null) {
+        final processedData = _processProfileData(cachedData);
+        setState(() {
+          profileData = processedData;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // All methods failed
+      setState(() {
+        errorMessage = result['error'] ?? 'Failed to load profile data';
+        isLoading = false;
+      });
     } catch (e) {
       print('Error loading profile data: $e');
       setState(() {
@@ -76,11 +102,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Process data to match the actual API response format
+  Map<String, dynamic> _processProfileData(Map<String, dynamic> rawData) {
+    print('=== PROCESSING PROFILE DATA ===');
+    print('Raw data keys: ${rawData.keys}');
+
+    Map<String, dynamic> processed = {};
+
+    // Map API response fields correctly based on actual API structure
+    processed['id'] = rawData['id'] ?? rawData['_id'];
+    processed['fullName'] = rawData['fullname'] ?? ''; // API uses 'fullname'
+    processed['profilePicture'] =
+        rawData['pictureUrl'] ?? ''; // API uses 'pictureUrl'
+    processed['experience'] = rawData['experience']?.toString() ?? '';
+    processed['expertise'] = rawData['expertise'] is List
+        ? rawData['expertise']
+        : [];
+    processed['languages'] = rawData['languages'] is List
+        ? rawData['languages']
+        : [];
+    processed['charge'] = rawData['charge']?.toString() ?? '';
+    processed['phoneNumber'] = rawData['phoneNumber'] ?? '';
+    processed['meetLink'] = rawData['meetLink'] ?? '';
+    processed['message'] = rawData['message'] ?? '';
+
+    // Fields that may not exist in current API response
+    processed['gender'] = rawData['gender'] ?? '';
+    processed['qualifications'] = rawData['qualifications'] ?? '';
+    processed['availability'] = rawData['availability'] ?? '';
+    processed['isActive'] = rawData['isActive'] ?? rawData['active'] ?? true;
+
+    print('Processed data keys: ${processed.keys}');
+    return processed;
+  }
+
   Future<void> _logout() async {
     try {
       print('Logging out...');
-      
-      // Show loading dialog
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -105,27 +164,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
       );
 
-      // Clear auth data
       await _authService.clearAuthData();
-      
-      // Close loading dialog
+
       Navigator.of(context).pop();
-      
-      // Navigate to auth screen and clear the entire navigation stack
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/auth',
-        (Route<dynamic> route) => false,
-      );
-      
+
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil('/auth', (Route<dynamic> route) => false);
     } catch (e) {
       print('Error during logout: $e');
-      
-      // Close loading dialog if it's open
+
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
-      
-      // Show error message
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -141,61 +193,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Enhanced field value extraction with proper field mapping
   String _getFieldValue(String key, [String defaultValue = 'Not Available']) {
     if (profileData == null) return defaultValue;
-    
-    // Try different possible field names
-    final possibleKeys = [
-      key,
-      key.toLowerCase(),
-      key.toUpperCase(),
-      '${key.toLowerCase()}_name',
-      '${key}Name',
-    ];
-    
-    for (String possibleKey in possibleKeys) {
-      if (profileData!.containsKey(possibleKey) && 
-          profileData![possibleKey] != null && 
-          profileData![possibleKey].toString().isNotEmpty) {
-        return profileData![possibleKey].toString();
-      }
+
+    final value = profileData![key];
+    if (value != null &&
+        value.toString().isNotEmpty &&
+        value.toString() != 'null') {
+      return value.toString();
     }
-    
+
     return defaultValue;
   }
 
   List<String> _getListField(String key) {
     if (profileData == null) return [];
-    
+
     final value = profileData![key];
     if (value is List) {
       return value.map((e) => e.toString()).toList();
-    } else if (value is String && value.isNotEmpty) {
-      // Handle comma-separated string
-      return value.split(',').map((e) => e.trim()).toList();
+    } else if (value is String && value.isNotEmpty && value != 'null') {
+      return value
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
+
     return [];
   }
 
   bool _getBoolField(String key, [bool defaultValue = false]) {
     if (profileData == null) return defaultValue;
-    
+
     final value = profileData![key];
     if (value is bool) return value;
     if (value is String) {
-      return value.toLowerCase() == 'true' || value == '1';
+      final lowerValue = value.toLowerCase();
+      return lowerValue == 'true' ||
+          lowerValue == '1' ||
+          lowerValue == 'active' ||
+          lowerValue == 'yes';
     }
     if (value is num) return value > 0;
-    
+
     return defaultValue;
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final width = size.width;
-    final scale = width / 375.0;
-    
+
     if (isLoading) {
       return Scaffold(
         backgroundColor: Colors.grey.shade50,
@@ -211,10 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(height: 16),
               Text(
                 'Loading profile...',
-                style: TextStyle(
-                  color: ColorConstants.color999999,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
               ),
             ],
           ),
@@ -229,12 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title: Text('Profile'),
           backgroundColor: Colors.brown.shade600,
           foregroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: Icon(Icons.logout),
-              onPressed: _logout,
-            ),
-          ],
+          actions: [IconButton(icon: Icon(Icons.logout), onPressed: _logout)],
         ),
         body: Center(
           child: Padding(
@@ -242,11 +283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: ColorConstants.redColor.withOpacity(0.7),
-                ),
+                Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
                 SizedBox(height: 16),
                 Text(
                   'Failed to load profile',
@@ -260,10 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   errorMessage,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: ColorConstants.color999999,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
                 SizedBox(height: 24),
                 ElevatedButton(
@@ -286,45 +320,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 280 * scale,
+            expandedHeight: 280,
             floating: false,
             pinned: true,
             backgroundColor: Colors.brown.shade600,
             actions: [
               Container(
-                margin: EdgeInsets.only(
-                  right: 16 * scale,
-                  top: 8 * scale,
-                  bottom: 8 * scale,
-                ),
+                margin: EdgeInsets.only(right: 16, top: 8, bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12 * scale),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: Icon(Icons.edit, color: Colors.white, size: 22 * scale),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Edit functionality coming soon!'),
-                        backgroundColor: Colors.brown.shade600,
+                  icon: Icon(Icons.edit, color: Colors.white, size: 22),
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ProfileEditScreen(initialData: profileData),
                       ),
                     );
+
+                    // Refresh profile data if edit was successful
+                    if (result == true) {
+                      _loadProfileData();
+                    }
                   },
                 ),
               ),
               Container(
-                margin: EdgeInsets.only(
-                  right: 16 * scale,
-                  top: 8 * scale,
-                  bottom: 8 * scale,
-                ),
+                margin: EdgeInsets.only(right: 16, top: 8, bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12 * scale),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: Icon(Icons.logout, color: Colors.white, size: 22 * scale),
+                  icon: Icon(Icons.logout, color: Colors.white, size: 22),
                   onPressed: _logout,
                 ),
               ),
@@ -341,63 +372,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(height: 60 * scale),
+                    SizedBox(height: 60),
                     Stack(
                       children: [
                         Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 4 * scale,
-                            ),
+                            border: Border.all(color: Colors.white, width: 4),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.3),
-                                blurRadius: 15 * scale,
-                                offset: Offset(0, 8 * scale),
+                                blurRadius: 15,
+                                offset: Offset(0, 8),
                               ),
                             ],
                           ),
                           child: CircleAvatar(
-                            radius: 65 * scale,
+                            radius: 65,
                             backgroundColor: Colors.white,
-                            backgroundImage: _getFieldValue('profile_picture') != 'Not Available' &&
-                                    _getFieldValue('pictureUrl') != 'Not Available'
-                                ? NetworkImage(_getFieldValue('profile_picture') != 'Not Available' 
-                                    ? _getFieldValue('profile_picture') 
-                                    : _getFieldValue('pictureUrl'))
+                            backgroundImage:
+                                _getFieldValue('profilePicture').isNotEmpty &&
+                                    _getFieldValue('profilePicture') !=
+                                        'Not Available'
+                                ? NetworkImage(_getFieldValue('profilePicture'))
                                 : null,
-                            child: (_getFieldValue('profile_picture') == 'Not Available' &&
-                                    _getFieldValue('pictureUrl') == 'Not Available')
+                            child:
+                                _getFieldValue('profilePicture') ==
+                                    'Not Available'
                                 ? Icon(
                                     Icons.person,
-                                    size: 70 * scale,
+                                    size: 70,
                                     color: Colors.brown.shade400,
                                   )
                                 : null,
                           ),
                         ),
                         Positioned(
-                          bottom: 8 * scale,
-                          right: 8 * scale,
+                          bottom: 8,
+                          right: 8,
                           child: Container(
-                            width: 28 * scale,
-                            height: 28 * scale,
+                            width: 28,
+                            height: 28,
                             decoration: BoxDecoration(
                               color: _getBoolField('isActive', true)
                                   ? Colors.green.shade500
                                   : Colors.red.shade500,
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 3 * scale,
-                              ),
+                              border: Border.all(color: Colors.white, width: 3),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 4 * scale,
-                                  offset: Offset(0, 2 * scale),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
                                 ),
                               ],
                             ),
@@ -406,37 +432,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? Icons.check
                                   : Icons.close,
                               color: Colors.white,
-                              size: 16 * scale,
+                              size: 16,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 20 * scale),
+                    SizedBox(height: 20),
                     Text(
                       _getFieldValue('fullName', 'Therapist Name'),
                       style: TextStyle(
-                        fontSize: 28 * scale,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 8 * scale),
+                    SizedBox(height: 8),
                     Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: 16 * scale,
-                        vertical: 8 * scale,
+                        horizontal: 16,
+                        vertical: 8,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20 * scale),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         _getBoolField('isActive', true)
-                            ? 'Active  ${_getFieldValue('experience', '0')} Years Experience'
+                            ? 'Active • ${_getFieldValue('experience', '0')} Years Experience'
                             : 'Inactive',
                         style: TextStyle(
-                          fontSize: 16 * scale,
+                          fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
@@ -448,10 +474,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
 
-          // Content
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.all(20 * scale),
+              padding: EdgeInsets.all(20),
               child: Column(
                 children: [
                   // Quick Stats Cards
@@ -468,10 +493,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
-                          'Level ${_getFieldValue('priority', '1')}',
-                          'Priority',
-                          Icons.star,
-                          Colors.orange.shade500,
+                          '${_getFieldValue('experience', '0')} Years',
+                          'Experience',
+                          Icons.timeline,
+                          Colors.blue.shade500,
                         ),
                       ),
                     ],
@@ -498,38 +523,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _getFieldValue('meetLink'),
                         isLink: true,
                       ),
-                    _buildInfoRow(
-                      Icons.calendar_today_rounded,
-                      'Member Since',
-                      _getFieldValue('joinedAt', _getFieldValue('createdAt', 'Unknown')),
-                    ),
                   ]),
 
                   SizedBox(height: 20),
 
-                  // Skills Section (if available)
-                  if (_getListField('expertise').isNotEmpty ||
-                      _getListField('languages').isNotEmpty ||
-                      _getListField('qualifications').isNotEmpty)
-                    _buildSkillsSection(),
+                  // Professional Information
+                  _buildInfoCard('Professional Information', Icons.work, [
+                    if (_getFieldValue('experience') != 'Not Available')
+                      _buildInfoRow(
+                        Icons.timeline,
+                        'Experience',
+                        '${_getFieldValue('experience')} years',
+                      ),
+                    if (_getFieldValue('charge') != 'Not Available')
+                      _buildInfoRow(
+                        Icons.currency_rupee,
+                        'Consultation Fee',
+                        '₹${_getFieldValue('charge')}',
+                      ),
+                    if (_getFieldValue('availability') != 'Not Available')
+                      _buildInfoRow(
+                        Icons.schedule,
+                        'Availability',
+                        _getFieldValue('availability'),
+                      )
+                    else
+                      _buildInfoRow(
+                        Icons.schedule,
+                        'Availability',
+                        'Please set your availability',
+                        isEmpty: true,
+                      ),
+                    if (_getFieldValue('qualifications') != 'Not Available')
+                      _buildInfoRow(
+                        Icons.school,
+                        'Qualifications',
+                        _getFieldValue('qualifications'),
+                      )
+                    else
+                      _buildInfoRow(
+                        Icons.school,
+                        'Qualifications',
+                        'Please add your qualifications',
+                        isEmpty: true,
+                      ),
+                  ]),
 
-                  if (_getListField('expertise').isNotEmpty ||
-                      _getListField('languages').isNotEmpty ||
-                      _getListField('qualifications').isNotEmpty)
-                    SizedBox(height: 20),
+                  SizedBox(height: 20),
+
+                  // Skills Section
+                  _buildSkillsSection(),
+
+                  SizedBox(height: 20),
 
                   // About Section
-                  if (_getFieldValue('message') != 'Not Available' &&
-                      _getFieldValue('message').isNotEmpty)
-                    _buildAboutCard(),
-
-                  if (_getFieldValue('message') != 'Not Available' &&
-                      _getFieldValue('message').isNotEmpty)
-                    SizedBox(height: 20),
-
-                  // Debug Info Card (for development)
-                  if (profileData != null)
-                    _buildDebugCard(),
+                  _buildAboutCard(),
 
                   SizedBox(height: 32),
                 ],
@@ -575,7 +623,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.black,
             ),
@@ -584,7 +632,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             label,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               color: Colors.grey.shade600,
               fontWeight: FontWeight.w500,
             ),
@@ -650,6 +698,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String label,
     String value, {
     bool isLink = false,
+    bool isEmpty = false,
   }) {
     return Padding(
       padding: EdgeInsets.only(bottom: 16),
@@ -659,10 +708,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: isEmpty ? Colors.orange.shade50 : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 20, color: Colors.brown.shade600),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isEmpty ? Colors.orange.shade600 : Colors.brown.shade600,
+            ),
           ),
           SizedBox(width: 16),
           Expanded(
@@ -678,10 +731,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 SizedBox(height: 4),
-                isLink
+                isLink && value != 'Not Available' && !isEmpty
                     ? GestureDetector(
                         onTap: () {
-                          // Handle link tap
+                          // Handle link tap - could launch URL or copy to clipboard
                         },
                         child: Text(
                           value,
@@ -698,8 +751,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         value,
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.black,
+                          color: isEmpty
+                              ? Colors.orange.shade600
+                              : value == 'Not Available'
+                              ? Colors.grey.shade500
+                              : Colors.black,
                           fontWeight: FontWeight.w600,
+                          fontStyle: (value == 'Not Available' || isEmpty)
+                              ? FontStyle.italic
+                              : FontStyle.normal,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -714,7 +774,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSkillsSection() {
     final expertise = _getListField('expertise');
     final languages = _getListField('languages');
-    final qualifications = _getListField('qualifications');
 
     return Container(
       width: double.infinity,
@@ -741,11 +800,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.brown.shade100,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.psychology, color: Colors.brown.shade600, size: 22),
+                child: Icon(
+                  Icons.psychology,
+                  color: Colors.brown.shade600,
+                  size: 22,
+                ),
               ),
               SizedBox(width: 12),
               Text(
-                'Skills & Qualifications',
+                'Skills & Languages',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -755,16 +818,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           SizedBox(height: 20),
-          
-          if (expertise.isNotEmpty) _buildSkillChips('Expertise', expertise),
-          if (languages.isNotEmpty) _buildSkillChips('Languages', languages),
-          if (qualifications.isNotEmpty) _buildSkillChips('Qualifications', qualifications),
+
+          if (expertise.isNotEmpty)
+            _buildSkillChips('Expertise', expertise, Colors.blue),
+          if (languages.isNotEmpty)
+            _buildSkillChips('Languages', languages, Colors.green),
+
+          if (expertise.isEmpty && languages.isEmpty)
+            Column(
+              children: [
+                Icon(
+                  Icons.add_circle_outline,
+                  size: 48,
+                  color: Colors.grey.shade400,
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'No skills added yet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Tap edit to add your expertise and languages',
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildSkillChips(String title, List<String> skills) {
+  Widget _buildSkillChips(
+    String title,
+    List<String> skills,
+    MaterialColor color,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -786,14 +879,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 skill,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.brown.shade700,
+                  color: color.shade700,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              backgroundColor: Colors.brown.shade50,
+              backgroundColor: color.shade50,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              side: BorderSide(color: Colors.brown.shade200),
+              side: BorderSide(color: color.shade200),
             );
           }).toList(),
         ),
@@ -803,6 +897,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAboutCard() {
+    final message = _getFieldValue('message');
+    final hasMessage = message != 'Not Available' && message.isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(24),
@@ -842,47 +939,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           SizedBox(height: 16),
-          Text(
-            _getFieldValue('message'),
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade800,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDebugCard() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Debug Information',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Profile Data Keys: ${profileData!.keys.join(', ')}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
-          ),
+          hasMessage
+              ? Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade800,
+                    height: 1.5,
+                  ),
+                )
+              : Column(
+                  children: [
+                    Icon(
+                      Icons.edit_note,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'No about message added yet',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Tap edit to add a professional message about yourself',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
         ],
       ),
     );

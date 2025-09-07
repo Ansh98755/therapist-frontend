@@ -10,22 +10,22 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  // Hardcoded analytics data
+  // Updated analytics data structure
   Map<String, dynamic> analyticsData = {
-    'bookingsToday': 12,
-    'bookingsThisMonth': 287,
-    'cancellationsThisMonth': 23,
-    'earningsThisMonth': 125000.0,
-    'lastMonthBookings': 245,
-    'lastMonthEarnings': 98000.0,
-    'weeklyBookings': [15, 18, 22, 19, 25, 20, 12], // Last 7 days
-    'monthlyData': [
-      {'month': 'Jan', 'bookings': 185, 'earnings': 75000},
-      {'month': 'Feb', 'bookings': 210, 'earnings': 85000},
-      {'month': 'Mar', 'bookings': 245, 'earnings': 98000},
-      {'month': 'Apr', 'bookings': 268, 'earnings': 110000},
-      {'month': 'May', 'bookings': 287, 'earnings': 125000},
-      {'month': 'Jun', 'bookings': 295, 'earnings': 132000},
+    'bookingCount': 287,
+    'totalIncomeBeforeShare': 150000.0,
+    'companyShareHaveToPay': 25000.0,
+    'finalIncome': 125000.0,
+    'totalCancellation': 23,
+    // Weekly total calculations for graph (last 7 days)
+    'weeklyTotals': [
+      {'day': 'Mon', 'total': 18000},
+      {'day': 'Tue', 'total': 22000},
+      {'day': 'Wed', 'total': 15000},
+      {'day': 'Thu', 'total': 25000},
+      {'day': 'Fri', 'total': 30000},
+      {'day': 'Sat', 'total': 20000},
+      {'day': 'Sun', 'total': 12000},
     ],
   };
 
@@ -49,7 +49,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           IconButton(
             icon: Icon(Icons.refresh, color: ColorConstants.blackColor),
             onPressed: () {
-              // Show a simple message when refresh is tapped
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Analytics refreshed!'),
@@ -66,7 +65,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // Show a simple message when refreshed
           await Future.delayed(Duration(milliseconds: 500));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -86,20 +84,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Main Stats
+              // Main Stats Cards
               _buildMainStats(),
               const SizedBox(height: 24),
 
-              // Quick Summary
-              _buildQuickSummary(),
+              // Income Breakdown
+              _buildIncomeBreakdown(),
               const SizedBox(height: 24),
 
-              // Simple Monthly Chart
-              _buildSimpleChart(),
-              const SizedBox(height: 24),
-
-              // Success Rate
-              _buildSuccessRate(),
+              // Weekly Total Calculations Chart
+              _buildWeeklyChart(),
             ],
           ),
         ),
@@ -114,19 +108,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           children: [
             Expanded(
               child: _buildStatCard(
-                title: 'Today\'s Bookings',
-                value: '${analyticsData['bookingsToday']}',
-                icon: Icons.today,
+                title: 'Total Bookings',
+                value: '${analyticsData['bookingCount']}',
+                icon: Icons.calendar_today,
                 color: ColorConstants.primaryOrangeColor,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                title: 'This Month',
-                value: '${analyticsData['bookingsThisMonth']}',
-                icon: Icons.calendar_month,
-                color: ColorConstants.themeColor,
+                title: 'Final Income',
+                value: '₹${(analyticsData['finalIncome'] / 1000).toInt()}k',
+                icon: Icons.account_balance_wallet,
+                color: ColorConstants.color7FB3B3,
               ),
             ),
           ],
@@ -136,20 +130,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           children: [
             Expanded(
               child: _buildStatCard(
-                title: 'Monthly Earnings',
-                value:
-                    '₹${(analyticsData['earningsThisMonth'] / 1000).toInt()}k',
-                icon: Icons.account_balance_wallet,
-                color: ColorConstants.color7FB3B3,
+                title: 'Total Cancellations',
+                value: '${analyticsData['totalCancellation']}',
+                icon: Icons.cancel_outlined,
+                color: ColorConstants.redColor,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                title: 'Cancellations',
-                value: '${analyticsData['cancellationsThisMonth']}',
-                icon: Icons.cancel_outlined,
-                color: ColorConstants.redColor,
+                title: 'Company Share',
+                value: '₹${(analyticsData['companyShareHaveToPay'] / 1000).toInt()}k',
+                icon: Icons.business,
+                color: ColorConstants.themeColor,
               ),
             ),
           ],
@@ -204,16 +197,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildQuickSummary() {
-    int bookingIncrease =
-        analyticsData['bookingsThisMonth'] - analyticsData['lastMonthBookings'];
-    double earningIncrease =
-        analyticsData['earningsThisMonth'] - analyticsData['lastMonthEarnings'];
-    double successRate =
-        ((analyticsData['bookingsThisMonth'] -
-            analyticsData['cancellationsThisMonth']) /
-        analyticsData['bookingsThisMonth'] *
-        100);
+  Widget _buildIncomeBreakdown() {
+    double successRate = ((analyticsData['bookingCount'] - analyticsData['totalCancellation']) / analyticsData['bookingCount'] * 100);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -232,7 +217,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'This Month Summary',
+            'Income Summary',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -241,28 +226,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           const SizedBox(height: 20),
           _buildSummaryRow(
-            'Bookings Growth',
-            '+$bookingIncrease from last month',
-            bookingIncrease > 0 ? Icons.trending_up : Icons.trending_down,
-            bookingIncrease > 0
-                ? ColorConstants.primaryOrangeColor
-                : ColorConstants.redColor,
+            'Total Income (Before Share)',
+            '₹${analyticsData['totalIncomeBeforeShare'].toInt()}',
+            Icons.trending_up,
+            ColorConstants.primaryOrangeColor,
           ),
           const SizedBox(height: 16),
           _buildSummaryRow(
-            'Earnings Growth',
-            '${earningIncrease > 0 ? '+' : ''}₹${earningIncrease.toInt()}',
-            earningIncrease > 0 ? Icons.trending_up : Icons.trending_down,
-            earningIncrease > 0
-                ? ColorConstants.primaryOrangeColor
-                : ColorConstants.redColor,
+            'Company Share to Pay',
+            '₹${analyticsData['companyShareHaveToPay'].toInt()}',
+            Icons.remove_circle_outline,
+            ColorConstants.redColor,
+          ),
+          const SizedBox(height: 16),
+          _buildSummaryRow(
+            'Final Income',
+            '₹${analyticsData['finalIncome'].toInt()}',
+            Icons.check_circle_outline,
+            ColorConstants.color7FB3B3,
           ),
           const SizedBox(height: 16),
           _buildSummaryRow(
             'Success Rate',
             '${successRate.toInt()}%',
-            Icons.check_circle_outline,
-            ColorConstants.color7FB3B3,
+            Icons.analytics,
+            ColorConstants.themeColor,
           ),
         ],
       ),
@@ -301,7 +289,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: TextStyle(fontSize: 14, color: ColorConstants.grey),
+                style: TextStyle(
+                  fontSize: 14, 
+                  color: ColorConstants.grey,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -310,7 +302,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildSimpleChart() {
+  Widget _buildWeeklyChart() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -328,11 +320,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Monthly Progress',
+            'Weekly Total Calculations',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: ColorConstants.primaryBrownColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Last 7 days earnings overview',
+            style: TextStyle(
+              fontSize: 14,
+              color: ColorConstants.grey,
             ),
           ),
           const SizedBox(height: 24),
@@ -341,8 +341,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
-                maxY: 400,
-                gridData: FlGridData(show: false),
+                maxY: 35000,
+                gridData: FlGridData(
+                  show: true,
+                  drawHorizontalLine: true,
+                  horizontalInterval: 10000,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: ColorConstants.grey.withOpacity(0.2),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
                   show: true,
@@ -356,18 +366,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        final months = [
-                          'Jan',
-                          'Feb',
-                          'Mar',
-                          'Apr',
-                          'May',
-                          'Jun',
-                        ];
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
-                            months[value.toInt()],
+                            analyticsData['weeklyTotals'][value.toInt()]['day'],
                             style: TextStyle(
                               color: ColorConstants.grey,
                               fontSize: 12,
@@ -381,14 +383,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 40,
-                      interval: 100,
+                      reservedSize: 45,
+                      interval: 10000,
                       getTitlesWidget: (value, meta) {
                         return Text(
-                          '${value.toInt()}',
+                          '${(value / 1000).toInt()}k',
                           style: TextStyle(
                             color: ColorConstants.grey,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         );
                       },
@@ -396,16 +398,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ),
                 ),
                 barGroups: List.generate(
-                  analyticsData['monthlyData'].length,
+                  analyticsData['weeklyTotals'].length,
                   (index) => BarChartGroupData(
                     x: index,
                     barRods: [
                       BarChartRodData(
-                        toY: analyticsData['monthlyData'][index]['bookings']
-                            .toDouble(),
+                        toY: analyticsData['weeklyTotals'][index]['total'].toDouble(),
                         color: ColorConstants.primaryOrangeColor,
-                        width: 24,
-                        borderRadius: BorderRadius.circular(4),
+                        width: 28,
+                        borderRadius: BorderRadius.circular(6),
+                        gradient: LinearGradient(
+                          colors: [
+                            ColorConstants.primaryOrangeColor,
+                            ColorConstants.primaryOrangeColor.withOpacity(0.7),
+                          ],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
                       ),
                     ],
                   ),
@@ -415,115 +424,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSuccessRate() {
-    double totalBookings = analyticsData['bookingsThisMonth'].toDouble();
-    double cancellations = analyticsData['cancellationsThisMonth'].toDouble();
-    double successful = totalBookings - cancellations;
-    double successPercentage = (successful / totalBookings) * 100;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: ColorConstants.whiteColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: ColorConstants.boxShadowBrownOpacity,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Booking Success Rate',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: ColorConstants.primaryBrownColor,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      '${successPercentage.toInt()}%',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: ColorConstants.primaryOrangeColor,
-                      ),
-                    ),
-                    Text(
-                      'Success Rate',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: ColorConstants.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    _buildSuccessItem(
-                      'Successful',
-                      successful.toInt().toString(),
-                      ColorConstants.primaryOrangeColor,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSuccessItem(
-                      'Cancelled',
-                      cancellations.toInt().toString(),
-                      ColorConstants.redColor,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSuccessItem(String label, String value, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: ColorConstants.primaryBrownColor,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: ColorConstants.grey),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

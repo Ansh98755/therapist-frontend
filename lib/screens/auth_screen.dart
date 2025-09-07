@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
-import 'package:therapist_app/home_page.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class NitiAuthScreen extends StatefulWidget {
@@ -54,83 +53,78 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
     HapticFeedback.lightImpact();
 
     try {
-      print('Attempting login with phone: ${_phoneController.text}');
+      print('=== LOGIN ATTEMPT ===');
+      print('Phone: ${_phoneController.text}');
+      print('Password: [HIDDEN]');
 
       final result = await _apiService.login(
         _phoneController.text,
         _passwordController.text,
       );
 
-      print('Login API result: $result');
+      print('=== LOGIN RESULT ===');
+      print('Success: ${result['success']}');
+      print('Result keys: ${result.keys}');
 
       if (result['success'] == true) {
-        final data = result['data'];
-
-        // Handle different possible response structures
+        // Extract token and user data from the API response
         String? token;
         Map<String, dynamic>? userData;
 
-        if (data is Map<String, dynamic>) {
-          // Try top-level token fields
-          token =
-              data['token'] ??
-              data['accessToken'] ??
-              data['authToken'] ??
-              data['access_token'];
+        // The API response structure might be:
+        // 1. { success: true, data: userData, token: token }
+        // 2. { success: true, data: { ...userData, token: token } }
+        // 3. { success: true, data: userData } (no explicit token)
 
-          // If token not found at top level, check nested 'data' or other nested objects
+        if (result['token'] != null) {
+          token = result['token'].toString();
+        }
+
+        if (result['data'] is Map<String, dynamic>) {
+          userData = Map<String, dynamic>.from(result['data']);
+          
+          // If token not found at root, check in userData
           if (token == null) {
-            final nested =
-                data['data'] ??
-                data['user'] ??
-                data['therapist'] ??
-                data['profile'];
-            if (nested is Map<String, dynamic>) {
-              token =
-                  nested['token'] ??
-                  nested['accessToken'] ??
-                  nested['authToken'] ??
-                  nested['access_token'];
-            }
-          }
-
-          // Try to extract user data from different possible locations (top-level or nested)
-          userData = data['user'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(data['user'])
-              : data['data'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(data['data'])
-              : data['therapist'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(data['therapist'])
-              : data['psychologist'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(data['psychologist'])
-              : null;
-
-          // As a last resort, use the entire response object (minus obvious token fields)
-          if (userData == null) {
-            userData = Map<String, dynamic>.from(data);
-            userData.remove('token');
-            userData.remove('accessToken');
-            userData.remove('authToken');
-            userData.remove('access_token');
+            token = userData['token']?.toString() ?? 
+                   userData['accessToken']?.toString() ??
+                   userData['authToken']?.toString() ??
+                   userData['access_token']?.toString();
           }
         }
 
-        String tokenPreview = token == null
-            ? 'null'
-            : (token.length > 20 ? '${token.substring(0, 20)}...' : token);
-        print('Extracted token: $tokenPreview');
-        print('Extracted user data: $userData');
+        print('=== EXTRACTED DATA ===');
+        print('Token: ${token?.isNotEmpty == true ? "${token!.substring(0, 20)}..." : "null/empty"}');
+        print('UserData keys: ${userData?.keys}');
 
-        if (token != null && token.isNotEmpty && userData != null) {
-          final saveSuccess = await _authService.saveAuthData(token, userData);
+        if (userData != null) {
+          // If no token provided by API, generate a temporary one
+          // This depends on your backend authentication strategy
+          if (token == null || token.isEmpty) {
+            // Option 1: Use therapist ID as token (if backend allows)
+            token = userData['_id']?.toString() ?? 
+                   userData['id']?.toString() ??
+                   'session_${DateTime.now().millisecondsSinceEpoch}';
+            
+            print('Generated fallback token: $token');
+          }
+
+          // Save auth data
+          final saveSuccess = await _authService.saveAuthData(token!, userData);
 
           if (saveSuccess) {
+            print('=== LOGIN SUCCESS ===');
+            
+            // Verify therapist ID extraction
+            final therapistId = await _authService.getTherapistId();
+            print('Extracted therapist ID: $therapistId');
+
             setState(() => _isLoading = false);
-            print('Login successful, auth data saved');
-            print('Auth state should now trigger AuthWrapper rebuild...');
+
             if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const HomePage()),
+              // Navigate to home and clear the navigation stack
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/home',
+                (Route<dynamic> route) => false,
               );
             }
           } else {
@@ -139,8 +133,8 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
           }
         } else {
           setState(() => _isLoading = false);
-          _showError('Invalid response: missing token or user data');
-          print('Login failed: token=$token, userData=$userData');
+          _showError('Invalid response: missing user data');
+          print('Login failed: userData is null');
         }
       } else {
         setState(() => _isLoading = false);
@@ -470,6 +464,7 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
   }
 }
 
+// Forgot Password Screen (keeping existing implementation)
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -34,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadBookings() async {
-    print('Loading bookings...');
+    print('=== LOADING BOOKINGS ===');
 
     final isLoggedIn = await _authService.isLoggedIn();
     if (!isLoggedIn) {
@@ -46,11 +47,13 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Check if we have therapist ID
     final therapistId = await _authService.getTherapistId();
     print('Current therapist ID: $therapistId');
     
-    if (therapistId == null) {
+    if (therapistId == null || therapistId.isEmpty) {
+      print('Therapist ID not found, attempting to refresh user data...');
+      await _authService.debugUserData();
+      
       setState(() {
         isLoading = false;
         errorMessage = 'Therapist ID not found. Please login again.';
@@ -74,13 +77,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      print('Fetching bookings data...');
+      print('=== FETCHING BOOKINGS DATA ===');
       
-      // Get current therapist ID to verify
       final therapistId = await _authService.getTherapistId();
       print('Using therapist ID: $therapistId');
       
-      if (therapistId == null) {
+      if (therapistId == null || therapistId.isEmpty) {
         setState(() {
           isLoading = false;
           isRefreshing = false;
@@ -89,77 +91,97 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      final result = await _apiService.getBookings();
+      // Apply filter-based API calls
+      Map<String, dynamic> result;
+      
+      switch (selectedFilter.toLowerCase()) {
+        case 'completed':
+          result = await _apiService.getBookings(finished: true);
+          break;
+        case 'pending':
+          result = await _apiService.getBookings(finished: false);
+          break;
+        case 'booked':
+          result = await _apiService.getBookings(meetStatus: 'booked');
+          break;
+        case 'confirmed':
+          result = await _apiService.getBookings(meetStatus: 'confirmed');
+          break;
+        case 'cancelled':
+          result = await _apiService.getBookings(meetStatus: 'cancelled');
+          break;
+        default:
+          result = await _apiService.getBookings();
+      }
 
-      print('Bookings API result: $result');
+      print('=== BOOKINGS API RESULT ===');
+      print('Success: ${result['success']}');
+      print('Result keys: ${result.keys}');
+      print('Full result: $result');
 
       if (result['success'] == true) {
         List<Map<String, dynamic>> fetchedBookings = [];
 
-        // Handle the actual API response structure from your logs
         dynamic responseData = result['data'];
+        print('Response data type: ${responseData.runtimeType}');
+        print('Response data: $responseData');
         
+        // Handle the API response structure you mentioned
         if (responseData is Map<String, dynamic>) {
-          // Extract the data array from the API response
+          // Check for the 'data' array in the response
           dynamic bookingsArray = responseData['data'];
           
           if (bookingsArray is List) {
+            print('Processing ${bookingsArray.length} raw bookings from responseData.data');
+            
             for (var booking in bookingsArray) {
               if (booking is Map<String, dynamic>) {
-                // Parse customer information
-                String clientName = 'Unknown Client';
-                String clientId = '';
-                
-                if (booking['customerId'] is Map<String, dynamic>) {
-                  final customer = booking['customerId'] as Map<String, dynamic>;
-                  clientName = customer['fullName'] ?? 'Unknown Client';
-                  clientId = customer['_id'] ?? '';
+                try {
+                  print('Processing booking: $booking');
+                  fetchedBookings.add(_processBookingData(booking));
+                } catch (e) {
+                  print('Error processing booking: $e');
+                  print('Problematic booking data: $booking');
                 }
-
-                // Format date and time
-                String formattedDate = 'No Date';
-                String formattedTime = 'No Time';
-                
-                if (booking['meetDate'] != null) {
-                  try {
-                    final meetDate = DateTime.parse(booking['meetDate']);
-                    formattedDate = '${meetDate.day}/${meetDate.month}/${meetDate.year}';
-                  } catch (e) {
-                    print('Date parsing error: $e');
-                  }
-                }
-                
-                if (booking['meetTime'] != null) {
-                  formattedTime = booking['meetTime'];
-                }
-
-                fetchedBookings.add({
-                  'id': booking['_id'] ?? '',
-                  'clientName': clientName,
-                  'clientId': clientId,
-                  'date': formattedDate,
-                  'time': formattedTime,
-                  'price': '500', // Default price since it's not in the response
-                  'type': booking['finished'] == true ? 'Completed' : 'Consultation',
-                  'link': booking['meetLink'] ?? '',
-                  'status': booking['meetStatus'] ?? 'Unknown',
-                  'finished': booking['finished'] ?? false,
-                  'meetingId': booking['_id'] ?? '',
-                  'meetDate': booking['meetDate'],
-                  'createdAt': booking['createdAt'],
-                });
               }
+            }
+          } else {
+            print('No bookings array found in response.data. Available keys: ${responseData.keys}');
+            // Fallback: try other possible array locations
+            dynamic fallbackArray = responseData['bookings'] ?? 
+                                   responseData['results'] ??
+                                   responseData;
+            
+            if (fallbackArray is List) {
+              print('Processing ${fallbackArray.length} raw bookings from fallback location');
+              for (var booking in fallbackArray) {
+                if (booking is Map<String, dynamic>) {
+                  fetchedBookings.add(_processBookingData(booking));
+                }
+              }
+            }
+          }
+        } else if (responseData is List) {
+          print('Processing ${responseData.length} raw bookings from direct array');
+          for (var booking in responseData) {
+            if (booking is Map<String, dynamic>) {
+              fetchedBookings.add(_processBookingData(booking));
             }
           }
         }
 
-        print('Processed ${fetchedBookings.length} bookings');
+        print('Successfully processed ${fetchedBookings.length} bookings');
 
         setState(() {
           bookings = fetchedBookings;
           isLoading = false;
           isRefreshing = false;
         });
+
+        if (fetchedBookings.isNotEmpty) {
+          print('Sample processed booking: ${fetchedBookings.first}');
+        }
+
       } else {
         print('API returned error: ${result['error']}');
         setState(() {
@@ -183,67 +205,160 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
-    try {
-      final result = await _apiService.cancelBooking(booking['id']);
+  Map<String, dynamic> _processBookingData(Map<String, dynamic> booking) {
+    print('\n🔍 === PROCESSING BOOKING DATA ===');
+    print('Raw booking keys: ${booking.keys.toList()}');
+    print('Raw booking data: $booking');
+    
+    // Extract booking ID
+    String bookingId = booking['_id']?.toString() ?? booking['id']?.toString() ?? '';
+    print('📋 Booking ID: $bookingId');
+    
+    // Parse customer information with detailed debugging
+    String clientName = 'Unknown Client';
+    String clientId = '';
+    String clientPhone = '';
+    
+    var customerData = booking['customerId'] ?? booking['customer'] ?? booking['client'];
+    print('👤 Customer data: $customerData (${customerData.runtimeType})');
+    
+    if (customerData is Map<String, dynamic>) {
+      print('👤 Customer is Map with keys: ${customerData.keys.toList()}');
+      
+      // Extract client name
+      String? fullName = customerData['fullName']?.toString();
+      String? name = customerData['name']?.toString();
+      clientName = fullName ?? name ?? 'Unknown Client';
+      print('👤 Client name extracted: $clientName');
+      
+      // Extract client ID
+      String? customerId = customerData['_id']?.toString();
+      String? id = customerData['id']?.toString();
+      clientId = customerId ?? id ?? '';
+      print('👤 Client ID extracted: $clientId');
+      
+      // Extract phone number
+      String? phoneNumber = customerData['phoneNumber']?.toString();
+      String? phone = customerData['phone']?.toString();
+      String? mobile = customerData['mobile']?.toString();
+      clientPhone = phoneNumber ?? phone ?? mobile ?? '';
+      print('👤 Client phone extracted: $clientPhone');
+      
+    } else if (customerData is String) {
+      clientId = customerData;
+      clientName = 'Client $clientId';
+      print('👤 Customer data is string: $customerData');
+    } else {
+      print('❌ Customer data is neither Map nor String: ${customerData.runtimeType}');
+    }
 
-      if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Booking cancelled successfully'),
-              backgroundColor: ColorConstants.color2E7D7D,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
-        // Refresh the bookings list
-        await fetchBookingsData();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? 'Failed to cancel booking'),
-              backgroundColor: ColorConstants.redColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to cancel booking'),
-            backgroundColor: ColorConstants.redColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+    // Parse date and time with detailed debugging
+    print('📅 Processing date and time...');
+    String formattedDate = 'No Date';
+    String formattedTime = 'No Time';
+    String displayDate = 'No Date';
+    DateTime? meetDateTime;
+    
+    String? meetDateStr = booking['meetDate']?.toString();
+    print('📅 Raw meetDate: $meetDateStr');
+    
+    if (meetDateStr != null && meetDateStr.isNotEmpty) {
+      try {
+        meetDateTime = DateTime.parse(meetDateStr);
+        formattedDate = '${meetDateTime.day.toString().padLeft(2, '0')}/${meetDateTime.month.toString().padLeft(2, '0')}/${meetDateTime.year}';
+        
+        // Create display date like "12 Aug 2025"
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        displayDate = '${meetDateTime.day} ${months[meetDateTime.month - 1]} ${meetDateTime.year}';
+        
+        print('📅 Parsed date successfully: $displayDate');
+      } catch (e) {
+        print('❌ Date parsing error for $meetDateStr: $e');
+        formattedDate = meetDateStr;
+        displayDate = meetDateStr;
       }
     }
+    
+    String? meetTimeStr = booking['meetTime']?.toString();
+    print('🕐 Raw meetTime: $meetTimeStr');
+    
+    if (meetTimeStr != null && meetTimeStr.isNotEmpty) {
+      formattedTime = meetTimeStr;
+      print('🕐 Formatted time: $formattedTime');
+    }
+
+    // Extract meeting link with debugging
+    String meetingLink = booking['meetLink']?.toString() ?? 
+                        booking['link']?.toString() ?? 
+                        booking['meetingLink']?.toString() ?? '';
+    print('🔗 Meeting link: $meetingLink');
+
+    // Determine booking status and type
+    String status = booking['meetStatus']?.toString() ?? 'pending';
+    bool isFinished = booking['finished'] ?? false;
+    String type = isFinished ? 'Completed' : 'Video Meeting';
+    print('📊 Status: $status, Finished: $isFinished, Type: $type');
+    
+    // Handle price/amount
+    String price = booking['price']?.toString() ?? 
+                 booking['amount']?.toString() ?? 
+                 booking['fee']?.toString() ?? 
+                 booking['charge']?.toString() ?? 
+                 '500';
+    print('💰 Price: $price');
+
+    // Parse creation date
+    DateTime? createdAt;
+    String? createdAtStr = booking['createdAt']?.toString();
+    print('📝 Raw createdAt: $createdAtStr');
+    
+    if (createdAtStr != null && createdAtStr.isNotEmpty) {
+      try {
+        createdAt = DateTime.parse(createdAtStr);
+        print('📝 Parsed createdAt: $createdAt');
+      } catch (e) {
+        print('❌ Error parsing createdAt: $e');
+      }
+    }
+
+    final processedBooking = {
+      'id': bookingId,
+      'clientName': clientName,
+      'clientId': clientId,
+      'clientPhone': clientPhone,
+      'date': formattedDate,
+      'displayDate': displayDate,
+      'time': formattedTime,
+      'price': price,
+      'type': type,
+      'link': meetingLink,
+      'status': status,
+      'finished': isFinished,
+      'meetingId': bookingId,
+      'meetDate': booking['meetDate'],
+      'meetDateTime': meetDateTime,
+      'createdAt': createdAt,
+      'notes': booking['notes']?.toString() ?? '',
+      'duration': booking['duration']?.toString() ?? '60 mins',
+      'rawData': booking, // Keep raw data for debugging
+    };
+
+    print('✅ Final processed booking:');
+    print('   - ID: ${processedBooking['id']}');
+    print('   - Client: ${processedBooking['clientName']}');
+    print('   - Phone: ${processedBooking['clientPhone']}');
+    print('   - Date: ${processedBooking['displayDate']}');
+    print('   - Time: ${processedBooking['time']}');
+    print('   - Link: ${processedBooking['link']}');
+    print('   - Status: ${processedBooking['status']}');
+    print('=== END PROCESSING ===\n');
+
+    return processedBooking;
   }
 
   List<Map<String, dynamic>> getFilteredBookings() {
     List<Map<String, dynamic>> filtered = bookings;
-
-    if (selectedFilter != 'All') {
-      filtered = filtered
-          .where(
-            (booking) =>
-                booking['status'].toString().toLowerCase() ==
-                selectedFilter.toLowerCase(),
-          )
-          .toList();
-    }
 
     if (searchQuery.isNotEmpty) {
       filtered = filtered
@@ -254,10 +369,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 ) ||
                 booking['type'].toString().toLowerCase().contains(
                   searchQuery.toLowerCase(),
+                ) ||
+                booking['status'].toString().toLowerCase().contains(
+                  searchQuery.toLowerCase(),
                 ),
           )
           .toList();
     }
+
+    // Sort by date - most recent first
+    filtered.sort((a, b) {
+      final dateA = a['meetDateTime'] as DateTime?;
+      final dateB = b['meetDateTime'] as DateTime?;
+      
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1;
+      if (dateB == null) return -1;
+      
+      return dateB.compareTo(dateA);
+    });
 
     return filtered;
   }
@@ -265,156 +395,194 @@ class _HomeScreenState extends State<HomeScreen> {
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'booked':
-        return ColorConstants.colorB2E5D1;
+        return Color(0xFFE8F5E8); // Light green
       case 'confirmed':
-        return ColorConstants.blueColor.withOpacity(0.1);
+        return Color(0xFFE3F2FD); // Light blue
       case 'pending':
-        return ColorConstants.primaryOrangeColor.withOpacity(0.1);
+        return Color(0xFFFFF3E0); // Light orange
       case 'cancelled':
-        return ColorConstants.redColor.withOpacity(0.1);
+        return Color(0xFFFFEBEE); // Light red
       case 'completed':
-        return ColorConstants.colorEFE5DA;
+        return Color(0xFFEFE5DA); // Light brown
       default:
-        return ColorConstants.grey3;
+        return Colors.grey.shade100;
     }
   }
 
   Color getStatusTextColor(String status) {
     switch (status.toLowerCase()) {
       case 'booked':
-        return ColorConstants.color2E7D7D;
+        return Color(0xFF2E7D32); // Dark green
       case 'confirmed':
-        return ColorConstants.blueColor;
+        return Color(0xFF1976D2); // Dark blue
       case 'pending':
-        return ColorConstants.primaryOrangeColor;
+        return Color(0xFFE65100); // Dark orange
       case 'cancelled':
-        return ColorConstants.redColor;
+        return Color(0xFFC62828); // Dark red
       case 'completed':
         return ColorConstants.primaryBrownColor;
       default:
-        return ColorConstants.color999999;
+        return Colors.grey.shade700;
     }
   }
 
-  void _showBookingOptions(Map<String, dynamic> booking) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ColorConstants.transparentColor,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: ColorConstants.whiteColor,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: ColorConstants.grey2,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            SizedBox(height: 20),
-            Text(
-              booking['clientName'],
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: ColorConstants.primaryBrownColor,
-              ),
-            ),
-            SizedBox(height: 20),
-            _buildBottomSheetOption(
-              Icons.info_outline,
-              'View Details',
-              ColorConstants.blueColor,
-              () {
-                Navigator.pop(context);
-                _showBookingDetails(booking);
-              },
-            ),
-            if (booking['link']?.toString().isNotEmpty == true)
-              _buildBottomSheetOption(
-                Icons.videocam,
-                'Join Meeting',
-                ColorConstants.color2E7D7D,
-                () {
-                  Navigator.pop(context);
-                  _copyLink(booking['link']);
-                },
-              ),
-            if (booking['status'].toString().toLowerCase() != 'cancelled' &&
-                booking['status'].toString().toLowerCase() != 'completed')
-              _buildBottomSheetOption(
-                Icons.cancel_outlined,
-                'Cancel Booking',
-                ColorConstants.redColor,
-                () {
-                  Navigator.pop(context);
-                  _confirmCancelBooking(booking);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _launchMeetingLink(String link) async {
+    if (link.isEmpty) {
+      _showMessage('Meeting link not available', isError: true);
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(link);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await _copyLink(link);
+      }
+    } catch (e) {
+      print('Error launching meeting link: $e');
+      await _copyLink(link);
+    }
   }
 
-  Widget _buildBottomSheetOption(
-    IconData icon,
-    String title,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title),
-      onTap: onTap,
-    );
+  Future<void> _copyLink(String link) async {
+    await Clipboard.setData(ClipboardData(text: link));
+    if (mounted) {
+      _showMessage('Meeting link copied to clipboard');
+    }
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError 
+            ? ColorConstants.redColor 
+            : ColorConstants.color2E7D7D,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 
   void _showBookingDetails(Map<String, dynamic> booking) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Booking Details',
-          style: TextStyle(color: ColorConstants.primaryBrownColor),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Client', booking['clientName']),
-            _buildDetailRow('Date', booking['date']),
-            _buildDetailRow('Time', booking['time']),
-            _buildDetailRow('Price', '₹${booking['price']}'),
-            _buildDetailRow('Type', booking['type']),
-            _buildDetailRow('Status', booking['status']),
-            if (booking['link']?.toString().isNotEmpty == true)
-              _buildDetailRow('Meeting Link', booking['link'], isSelectable: true),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: ColorConstants.primaryBrownColor),
-            ),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Booking Details',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: ColorConstants.primaryBrownColor,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close, color: Colors.grey),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              
+              // Client Info
+              _buildDetailSection('Client Information', [
+                _buildDetailRow('Name', booking['clientName']),
+                if (booking['clientPhone'].toString().isNotEmpty)
+                  _buildDetailRow('Phone', booking['clientPhone']),
+                _buildDetailRow('Client ID', booking['clientId']),
+              ]),
+              
+              SizedBox(height: 16),
+              
+              // Session Info
+              _buildDetailSection('Session Details', [
+                _buildDetailRow('Date', booking['displayDate']),
+                _buildDetailRow('Time', booking['time']),
+                _buildDetailRow('Type', booking['type']),
+                _buildDetailRow('Duration', booking['duration']),
+                _buildDetailRow('Fee', '₹${booking['price']}'),
+                _buildDetailRow('Status', booking['status']),
+                if (booking['createdAt'] != null)
+                  _buildDetailRow('Booked On', 
+                    '${booking['createdAt'].day}/${booking['createdAt'].month}/${booking['createdAt'].year}'),
+              ]),
+              
+              if (booking['notes'].toString().isNotEmpty) ...[
+                SizedBox(height: 16),
+                _buildDetailSection('Notes', [
+                  Text(
+                    booking['notes'],
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ]),
+              ],
+              
+              if (booking['link']?.toString().isNotEmpty == true) ...[
+                SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _launchMeetingLink(booking['link']);
+                    },
+                    icon: Icon(Icons.videocam, color: Colors.white),
+                    label: Text('Join Meeting', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFFF6B35),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isSelectable = false}) {
+  Widget _buildDetailSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: ColorConstants.primaryBrownColor,
+          ),
+        ),
+        SizedBox(height: 8),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.only(bottom: 8),
       child: Row(
@@ -425,82 +593,51 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               '$label:',
               style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: ColorConstants.color999999,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+                fontSize: 14,
               ),
             ),
           ),
           Expanded(
-            child: isSelectable 
-              ? SelectableText(
-                  value,
-                  style: TextStyle(color: ColorConstants.blackColor),
-                )
-              : Text(
-                  value,
-                  style: TextStyle(color: ColorConstants.blackColor),
-                ),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _copyLink(String link) async {
-    await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Meeting link copied to clipboard'),
-          backgroundColor: ColorConstants.color2E7D7D,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
+    try {
+      final result = await _apiService.cancelBooking(booking['id']);
+
+      if (result['success'] == true) {
+        if (mounted) {
+          _showMessage('Booking cancelled successfully');
+        }
+        await fetchBookingsData();
+      } else {
+        if (mounted) {
+          _showMessage(result['error'] ?? 'Failed to cancel booking', isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Failed to cancel booking', isError: true);
+      }
     }
-  }
-
-  void _confirmCancelBooking(Map<String, dynamic> booking) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Cancel Booking',
-          style: TextStyle(color: ColorConstants.primaryBrownColor),
-        ),
-        content: Text(
-          'Are you sure you want to cancel this booking with ${booking['clientName']}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'No',
-              style: TextStyle(color: ColorConstants.color999999),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _cancelBooking(booking);
-            },
-            child: Text(
-              'Yes, Cancel',
-              style: TextStyle(color: ColorConstants.redColor),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _logout() async {
     try {
       print('Logging out...');
       
-      // Show loading dialog
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -525,13 +662,10 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
-      // Clear auth data
       await _authService.clearAuthData();
       
-      // Close loading dialog
       Navigator.of(context).pop();
       
-      // Navigate to auth screen and clear the entire navigation stack
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/auth',
         (Route<dynamic> route) => false,
@@ -540,23 +674,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Error during logout: $e');
       
-      // Close loading dialog if it's open
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
       
-      // Show error message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error during logout. Please try again.'),
-            backgroundColor: ColorConstants.redColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        _showMessage('Error during logout. Please try again.', isError: true);
       }
     }
   }
@@ -566,7 +689,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final filteredBookings = getFilteredBookings();
 
     return Scaffold(
-      backgroundColor: ColorConstants.colorF5F5F5,
+      backgroundColor: Colors.grey.shade50,
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -580,23 +703,23 @@ class _HomeScreenState extends State<HomeScreen> {
   AppBar _buildAppBar() {
     return AppBar(
       automaticallyImplyLeading: false,
-      backgroundColor: ColorConstants.whiteColor,
+      backgroundColor: Colors.white,
       elevation: 0,
       title: Text(
         'My Bookings',
         style: TextStyle(
-          color: ColorConstants.blackColor,
+          color: Colors.black,
           fontSize: 24,
           fontWeight: FontWeight.bold,
         ),
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.refresh, color: ColorConstants.blackColor),
+          icon: Icon(Icons.refresh, color: Colors.black),
           onPressed: () => fetchBookingsData(),
         ),
         PopupMenuButton<String>(
-          icon: Icon(Icons.more_vert, color: ColorConstants.blackColor),
+          icon: Icon(Icons.more_vert, color: Colors.black),
           onSelected: (value) {
             if (value == 'logout') _logout();
           },
@@ -610,29 +733,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchAndFilter() {
     return Container(
-      color: ColorConstants.whiteColor,
+      color: Colors.white,
       padding: EdgeInsets.all(16),
       child: Column(
         children: [
           TextField(
             controller: searchController,
             decoration: InputDecoration(
-              hintText: 'Search clients or booking type...',
-              prefixIcon: Icon(Icons.search, color: ColorConstants.grey),
+              hintText: 'Search clients...',
+              prefixIcon: Icon(Icons.search, color: Colors.grey),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: ColorConstants.grey2),
+                borderSide: BorderSide(color: Colors.grey.shade300),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: ColorConstants.grey2),
+                borderSide: BorderSide(color: Colors.grey.shade300),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: ColorConstants.primaryBrownColor),
               ),
               filled: true,
-              fillColor: ColorConstants.grey3,
+              fillColor: Colors.grey.shade50,
             ),
             onChanged: (value) => setState(() => searchQuery = value),
           ),
@@ -643,10 +766,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 'All',
                 'Booked',
-                'Confirmed',
+                'Confirmed', 
                 'Pending',
-                'Cancelled',
                 'Completed',
+                'Cancelled',
               ].map((filter) => _buildFilterChip(filter)).toList(),
             ),
           ),
@@ -662,13 +785,18 @@ class _HomeScreenState extends State<HomeScreen> {
       child: FilterChip(
         label: Text(filter),
         selected: isSelected,
-        onSelected: (selected) => setState(() => selectedFilter = filter),
+        onSelected: (selected) {
+          setState(() {
+            selectedFilter = filter;
+          });
+          fetchBookingsData();
+        },
         selectedColor: ColorConstants.colorE6DBCF,
         checkmarkColor: ColorConstants.primaryBrownColor,
         labelStyle: TextStyle(
           color: isSelected
               ? ColorConstants.primaryBrownColor
-              : ColorConstants.color999999,
+              : Colors.grey.shade600,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
@@ -689,7 +817,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: 16),
             Text(
               'Loading your bookings...',
-              style: TextStyle(color: ColorConstants.color999999, fontSize: 16),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
             ),
           ],
         ),
@@ -709,9 +837,265 @@ class _HomeScreenState extends State<HomeScreen> {
       color: ColorConstants.primaryBrownColor,
       child: ListView.builder(
         physics: AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(vertical: 8),
         itemCount: filteredBookings.length,
         itemBuilder: (context, index) =>
-            _buildBookingCard(filteredBookings[index]),
+            _buildModernBookingCard(filteredBookings[index]),
+      ),
+    );
+  }
+
+  Widget _buildModernBookingCard(Map<String, dynamic> booking) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showBookingDetails(booking),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        booking['clientName'].toString(),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: getStatusColor(booking['status'].toString()),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        booking['status'].toString().toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: getStatusTextColor(booking['status'].toString()),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                SizedBox(height: 4),
+                
+                if (booking['clientPhone'].toString().isNotEmpty) ...[
+                  Text(
+                    booking['clientPhone'].toString(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                ],
+                
+                Text(
+                  'Therapist Session',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                
+                SizedBox(height: 16),
+                
+                // Date and Time Row
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      booking['displayDate'].toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(width: 20),
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      booking['time'].toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                SizedBox(height: 8),
+                
+                Row(
+                  children: [
+                    Icon(
+                      Icons.currency_rupee,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      '₹${booking['price']}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(width: 20),
+                    Icon(
+                      Icons.videocam,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      booking['type'].toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                if (booking['link']?.toString().isNotEmpty == true) ...[
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      // Reschedule Button
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            // Add reschedule functionality
+                            _showMessage('Reschedule functionality coming soon');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.brown.shade600),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 16,
+                                color: Colors.brown.shade600,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Reschedule',
+                                style: TextStyle(
+                                  color: Colors.brown.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      SizedBox(width: 12),
+                      
+                      // Join Button
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _launchMeetingLink(booking['link']),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFFF6B35), // Orange color
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.videocam,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Join',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.link_off,
+                        size: 16,
+                        color: Colors.grey.shade400,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Meeting link will be provided soon',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -726,7 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: ColorConstants.redColor.withOpacity(0.7),
+              color: Colors.red.shade400,
             ),
             SizedBox(height: 16),
             Text(
@@ -741,7 +1125,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               errorMessage,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: ColorConstants.color999999),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
             SizedBox(height: 24),
             Row(
@@ -751,7 +1135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: fetchBookingsData,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ColorConstants.primaryBrownColor,
-                    foregroundColor: ColorConstants.whiteColor,
+                    foregroundColor: Colors.white,
                   ),
                   child: Text('Try Again'),
                 ),
@@ -760,7 +1144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _logout,
                   child: Text(
                     'Logout',
-                    style: TextStyle(color: ColorConstants.redColor),
+                    style: TextStyle(color: Colors.red.shade600),
                   ),
                 ),
               ],
@@ -781,7 +1165,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               Icons.calendar_today,
               size: 64,
-              color: ColorConstants.color999999,
+              color: Colors.grey.shade400,
             ),
             SizedBox(height: 16),
             Text(
@@ -798,167 +1182,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? 'Your bookings will appear here when clients book sessions'
                   : 'No bookings found for "$selectedFilter" status',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: ColorConstants.color999999),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
             SizedBox(height: 24),
             ElevatedButton(
               onPressed: fetchBookingsData,
               style: ElevatedButton.styleFrom(
                 backgroundColor: ColorConstants.primaryBrownColor,
-                foregroundColor: ColorConstants.whiteColor,
+                foregroundColor: Colors.white,
               ),
               child: Text('Refresh'),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBookingCard(Map<String, dynamic> booking) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: ColorConstants.whiteColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: ColorConstants.colorBlack12,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: ColorConstants.transparentColor,
-        child: InkWell(
-          onTap: () => _showBookingOptions(booking),
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        booking['clientName'].toString(),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: ColorConstants.primaryBrownColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: getStatusColor(booking['status'].toString()),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        booking['status'].toString(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: getStatusTextColor(
-                            booking['status'].toString(),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: ColorConstants.color999999,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      booking['date'].toString(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: ColorConstants.color999999,
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Icon(
-                      Icons.access_time,
-                      size: 16,
-                      color: ColorConstants.color999999,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      booking['time'].toString(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: ColorConstants.color999999,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.category,
-                      size: 16,
-                      color: ColorConstants.color999999,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      booking['type'].toString(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: ColorConstants.color999999,
-                      ),
-                    ),
-                    Spacer(),
-                    Text(
-                      '₹${booking['price']}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: ColorConstants.color2E7D7D,
-                      ),
-                    ),
-                  ],
-                ),
-                if (booking['link']?.toString().isNotEmpty == true)
-                  Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: OutlinedButton.icon(
-                      onPressed: () => _copyLink(booking['link']),
-                      icon: Icon(
-                        Icons.link,
-                        size: 16,
-                        color: ColorConstants.color2E7D7D,
-                      ),
-                      label: Text(
-                        'Copy Meeting Link',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: ColorConstants.color2E7D7D,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: ColorConstants.color2E7D7D),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
         ),
       ),
     );
