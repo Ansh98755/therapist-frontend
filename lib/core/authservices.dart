@@ -1,27 +1,26 @@
-import 'package:shared_preferences/shared_preferences.dart';
+// Removed direct SharedPreferences usage; handled by SharedPrefService
+import 'package:therapist_app/core/shared_pref.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String _authTokenKey = 'auth_token';
-  static const String _userDataKey = 'user_data';
-  static const String _lastLoginTimeKey = 'last_login_time';
-  static const String _tokenExpiryKey = 'token_expiry';
+  // Keys now managed inside SharedPrefService. Kept only if other modules depend.
 
   // Stream controller for auth state changes
-  static final StreamController<bool> _authStateController = 
+  static final StreamController<bool> _authStateController =
       StreamController<bool>.broadcast(
-    onListen: () async {
-      try {
-        final current = await AuthService().isLoggedIn();
-        print('AuthService.onListen: emitting current auth state: $current');
-        _authStateController.add(current);
-      } catch (e) {
-        print('AuthService.onListen error: $e');
-      }
-    },
-  );
+        onListen: () async {
+          try {
+            final current = await AuthService().isLoggedIn();
+            print(
+              'AuthService.onListen: emitting current auth state: $current',
+            );
+            _authStateController.add(current);
+          } catch (e) {
+            print('AuthService.onListen error: $e');
+          }
+        },
+      );
   static Stream<bool> get authStateStream => _authStateController.stream;
   static bool get hasAuthListeners => _authStateController.hasListener;
 
@@ -38,12 +37,11 @@ class AuthService {
 
   Future<bool> saveAuthData(String token, Map<String, dynamic> userData) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
-
-      await prefs.setString(_authTokenKey, token);
-      await prefs.setString(_userDataKey, jsonEncode(userData));
-      await prefs.setString(_lastLoginTimeKey, now.toIso8601String());
+      final sp = SharedPrefService();
+      await sp.saveToken(token);
+      await sp.saveUserData(userData);
+      await sp.saveLastLogin(now);
 
       // Set token expiry based on JWT expiry or default to 24 hours
       DateTime expiryTime;
@@ -54,8 +52,8 @@ class AuthService {
         print('Error getting JWT expiry, using default: $e');
         expiryTime = now.add(const Duration(hours: 24));
       }
-      
-      await prefs.setString(_tokenExpiryKey, expiryTime.toIso8601String());
+
+      await sp.saveTokenExpiry(expiryTime);
 
       _cachedToken = token;
       _cachedUserData = userData;
@@ -65,7 +63,9 @@ class AuthService {
       _cachedTherapistId = await _extractTherapistId();
 
       print('Auth data saved successfully');
-      print('Token: ${token.length > 20 ? '${token.substring(0, 20)}...' : token}');
+      print(
+        'Token: ${token.length > 20 ? '${token.substring(0, 20)}...' : token}',
+      );
       print('User data keys: ${userData.keys}');
       print('Cached therapist ID: $_cachedTherapistId');
 
@@ -88,7 +88,7 @@ class AuthService {
       if (parts.length != 3) return null;
 
       final payload = parts[1];
-      
+
       // Add padding if needed
       String normalizedPayload = payload;
       switch (payload.length % 4) {
@@ -122,8 +122,8 @@ class AuthService {
         return _cachedToken;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(_authTokenKey);
+      final sp = SharedPrefService();
+      final token = await sp.getToken();
 
       if (token != null && token.isNotEmpty) {
         _cachedToken = token;
@@ -141,11 +141,9 @@ class AuthService {
     try {
       if (_cachedUserData != null) return _cachedUserData;
 
-      final prefs = await SharedPreferences.getInstance();
-      final userDataString = prefs.getString(_userDataKey);
-
-      if (userDataString != null && userDataString.isNotEmpty) {
-        final userData = json.decode(userDataString) as Map<String, dynamic>;
+      final sp = SharedPrefService();
+      final userData = await sp.getUserData();
+      if (userData != null) {
         _cachedUserData = userData;
         return userData;
       }
@@ -160,14 +158,16 @@ class AuthService {
     try {
       final userData = await getUserData();
       final token = await getAuthToken();
-      
+
       print('=== USER DATA DEBUG ===');
       print('Full user data: $userData');
-      print('Token: ${token != null && token.length > 20 ? '${token.substring(0, 20)}...' : token}');
+      print(
+        'Token: ${token != null && token.length > 20 ? '${token.substring(0, 20)}...' : token}',
+      );
 
       if (userData != null) {
         print('Available keys: ${userData.keys}');
-        
+
         userData.forEach((key, value) {
           print('$key: $value (${value.runtimeType})');
           if (value is Map<String, dynamic>) {
@@ -205,7 +205,7 @@ class AuthService {
       if (parts.length != 3) return null;
 
       final payload = parts[1];
-      
+
       // Add padding if needed
       String normalizedPayload = payload;
       switch (payload.length % 4) {
@@ -237,7 +237,7 @@ class AuthService {
 
       // Extract therapist ID
       _cachedTherapistId = await _extractTherapistId();
-      
+
       if (_cachedTherapistId != null && _cachedTherapistId!.isNotEmpty) {
         print('Extracted and cached therapist ID: $_cachedTherapistId');
         return _cachedTherapistId;
@@ -263,11 +263,17 @@ class AuthService {
         final jwtPayload = _parseJWTPayload(token);
         if (jwtPayload != null) {
           print('JWT Payload keys: ${jwtPayload.keys}');
-          
+
           // Check common JWT fields for therapist ID
           final jwtFields = [
-            'therapistId', 'therapist_id', 'psychologistId', 
-            'psychologist_id', 'userId', 'user_id', 'id', 'sub'
+            'therapistId',
+            'therapist_id',
+            'psychologistId',
+            'psychologist_id',
+            'userId',
+            'user_id',
+            'id',
+            'sub',
           ];
 
           for (final field in jwtFields) {
@@ -287,27 +293,45 @@ class AuthService {
 
         // Check direct fields
         final directFields = [
-          '_id', 'id', 'therapistId', 'psychologistId', 'userId', 
-          'therapist_id', 'psychologist_id', 'user_id',
-          'therapistID', 'psychologistID', 'userID', 'ID'
+          '_id',
+          'id',
+          'therapistId',
+          'psychologistId',
+          'userId',
+          'therapist_id',
+          'psychologist_id',
+          'user_id',
+          'therapistID',
+          'psychologistID',
+          'userID',
+          'ID',
         ];
 
         for (final field in directFields) {
           if (userData[field] != null) {
             therapistId = userData[field].toString();
-            print('Found therapist ID in userData field "$field": $therapistId');
+            print(
+              'Found therapist ID in userData field "$field": $therapistId',
+            );
             return therapistId;
           }
         }
 
         // Check nested objects
-        final nestedObjectKeys = ['data', 'user', 'therapist', 'psychologist', 'profile', 'therapistData'];
-        
+        final nestedObjectKeys = [
+          'data',
+          'user',
+          'therapist',
+          'psychologist',
+          'profile',
+          'therapistData',
+        ];
+
         for (final objKey in nestedObjectKeys) {
           if (userData[objKey] is Map<String, dynamic>) {
             final nestedObj = userData[objKey] as Map<String, dynamic>;
             print('Checking nested $objKey object keys: ${nestedObj.keys}');
-            
+
             for (final field in directFields) {
               if (nestedObj[field] != null) {
                 therapistId = nestedObj[field].toString();
@@ -363,15 +387,13 @@ class AuthService {
 
   Future<bool> _isTokenExpired() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final expiryString = prefs.getString(_tokenExpiryKey);
+      final sp = SharedPrefService();
+      final expiryTime = await sp.getTokenExpiry();
 
-      if (expiryString == null) {
+      if (expiryTime == null) {
         print('No expiry time found, considering token expired');
         return true;
       }
-
-      final expiryTime = DateTime.parse(expiryString);
       final isExpired = DateTime.now().isAfter(expiryTime);
 
       print('Token expiry check: ${isExpired ? "EXPIRED" : "VALID"}');
@@ -384,13 +406,9 @@ class AuthService {
 
   Future<void> _initializeCache() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _cachedToken = prefs.getString(_authTokenKey);
-
-      final userDataString = prefs.getString(_userDataKey);
-      if (userDataString != null && userDataString.isNotEmpty) {
-        _cachedUserData = json.decode(userDataString) as Map<String, dynamic>;
-      }
+      final sp = SharedPrefService();
+      _cachedToken = await sp.getToken();
+      _cachedUserData = await sp.getUserData();
 
       // Extract and cache therapist ID
       _cachedTherapistId = await _extractTherapistId();
@@ -405,11 +423,7 @@ class AuthService {
 
   Future<void> clearAuthData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_authTokenKey);
-      await prefs.remove(_userDataKey);
-      await prefs.remove(_lastLoginTimeKey);
-      await prefs.remove(_tokenExpiryKey);
+      await SharedPrefService().clearAuth();
 
       // Clear cache
       _cachedToken = null;
