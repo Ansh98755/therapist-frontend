@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
@@ -82,18 +83,21 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
 
         if (result['data'] is Map<String, dynamic>) {
           userData = Map<String, dynamic>.from(result['data']);
-          
+
           // If token not found at root, check in userData
           if (token == null) {
-            token = userData['token']?.toString() ?? 
-                   userData['accessToken']?.toString() ??
-                   userData['authToken']?.toString() ??
-                   userData['access_token']?.toString();
+            token =
+                userData['token']?.toString() ??
+                userData['accessToken']?.toString() ??
+                userData['authToken']?.toString() ??
+                userData['access_token']?.toString();
           }
         }
 
         print('=== EXTRACTED DATA ===');
-        print('Token: ${token?.isNotEmpty == true ? "${token!.substring(0, 20)}..." : "null/empty"}');
+        print(
+          'Token: ${token?.isNotEmpty == true ? "${token!.substring(0, 20)}..." : "null/empty"}',
+        );
         print('UserData keys: ${userData?.keys}');
 
         if (userData != null) {
@@ -101,19 +105,20 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
           // This depends on your backend authentication strategy
           if (token == null || token.isEmpty) {
             // Option 1: Use therapist ID as token (if backend allows)
-            token = userData['_id']?.toString() ?? 
-                   userData['id']?.toString() ??
-                   'session_${DateTime.now().millisecondsSinceEpoch}';
-            
+            token =
+                userData['_id']?.toString() ??
+                userData['id']?.toString() ??
+                'session_${DateTime.now().millisecondsSinceEpoch}';
+
             print('Generated fallback token: $token');
           }
 
           // Save auth data
-          final saveSuccess = await _authService.saveAuthData(token!, userData);
+          final saveSuccess = await _authService.saveAuthData(token, userData);
 
           if (saveSuccess) {
             print('=== LOGIN SUCCESS ===');
-            
+
             // Verify therapist ID extraction
             final therapistId = await _authService.getTherapistId();
             print('Extracted therapist ID: $therapistId');
@@ -122,10 +127,9 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
 
             if (mounted) {
               // Navigate to home and clear the navigation stack
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/home',
-                (Route<dynamic> route) => false,
-              );
+              if (context.mounted) {
+                context.go('/home');
+              }
             }
           } else {
             setState(() => _isLoading = false);
@@ -402,12 +406,7 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
       child: TextButton(
         onPressed: () {
           HapticFeedback.lightImpact();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ForgotPasswordScreen(),
-            ),
-          );
+          context.push('/forgot-password');
         },
         child: const Text(
           'Forgot Password?',
