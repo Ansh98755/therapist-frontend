@@ -1,10 +1,39 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:therapist_app/core/app_state.dart';
+import 'package:therapist_app/firebase/fcm/fcm_service.dart';
+import 'package:therapist_app/firebase/firebase_config.dart';
 import 'package:therapist_app/routes/routes.dart';
 import 'package:therapist_app/screens/auth_wrapper.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    print("Error loading .env file: $e");
+  }
+
+  try {
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: FirebaseConfig.apiKey,
+        appId: FirebaseConfig.appId,
+        messagingSenderId: FirebaseConfig.messagingSenderId,
+        projectId: FirebaseConfig.projectId,
+        storageBucket: FirebaseConfig.storageBucket,
+      ),
+    );
+    await FCMService().initFCM();
+    String? fcmToken = await FCMService().getFcmToken();
+    print("Fcm Token for testing notification ${fcmToken}");
+
+    print("Firebase initialized successfully");
+  } catch (e) {
+    print("Error initializing Firebase: $e");
+  }
   await AppState().initialize();
   runApp(const MyApp());
 }
