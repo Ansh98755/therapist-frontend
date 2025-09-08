@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/screens/post_details_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class CommunityPost {
@@ -521,17 +521,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   void _navigateToNewPost(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const NewPostScreen()),
-    );
+    context.push('/community/new');
   }
 
   void _navigateToPostDetails(CommunityPost post) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => PostDetailsScreen(post: post)),
-    );
+    context.push('/community/post', extra: post);
   }
 }
 

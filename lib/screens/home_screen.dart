@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show Platform;
+import 'package:android_intent_plus/android_intent.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -49,11 +52,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final therapistId = await _authService.getTherapistId();
     print('Current therapist ID: $therapistId');
-    
+
     if (therapistId == null || therapistId.isEmpty) {
       print('Therapist ID not found, attempting to refresh user data...');
       await _authService.debugUserData();
-      
+
       setState(() {
         isLoading = false;
         errorMessage = 'Therapist ID not found. Please login again.';
@@ -78,10 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       print('=== FETCHING BOOKINGS DATA ===');
-      
+
       final therapistId = await _authService.getTherapistId();
       print('Using therapist ID: $therapistId');
-      
+
       if (therapistId == null || therapistId.isEmpty) {
         setState(() {
           isLoading = false;
@@ -91,28 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Apply filter-based API calls
-      Map<String, dynamic> result;
-      
-      switch (selectedFilter.toLowerCase()) {
-        case 'completed':
-          result = await _apiService.getBookings(finished: true);
-          break;
-        case 'pending':
-          result = await _apiService.getBookings(finished: false);
-          break;
-        case 'booked':
-          result = await _apiService.getBookings(meetStatus: 'booked');
-          break;
-        case 'confirmed':
-          result = await _apiService.getBookings(meetStatus: 'confirmed');
-          break;
-        case 'cancelled':
-          result = await _apiService.getBookings(meetStatus: 'cancelled');
-          break;
-        default:
-          result = await _apiService.getBookings();
-      }
+      // Always fetch ALL bookings once; apply UI filter locally to avoid backend status mismatch issues
+      Map<String, dynamic> result = await _apiService.getBookings();
 
       print('=== BOOKINGS API RESULT ===');
       print('Success: ${result['success']}');
@@ -125,15 +108,17 @@ class _HomeScreenState extends State<HomeScreen> {
         dynamic responseData = result['data'];
         print('Response data type: ${responseData.runtimeType}');
         print('Response data: $responseData');
-        
+
         // Handle the API response structure you mentioned
         if (responseData is Map<String, dynamic>) {
           // Check for the 'data' array in the response
           dynamic bookingsArray = responseData['data'];
-          
+
           if (bookingsArray is List) {
-            print('Processing ${bookingsArray.length} raw bookings from responseData.data');
-            
+            print(
+              'Processing ${bookingsArray.length} raw bookings from responseData.data',
+            );
+
             for (var booking in bookingsArray) {
               if (booking is Map<String, dynamic>) {
                 try {
@@ -146,14 +131,19 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             }
           } else {
-            print('No bookings array found in response.data. Available keys: ${responseData.keys}');
+            print(
+              'No bookings array found in response.data. Available keys: ${responseData.keys}',
+            );
             // Fallback: try other possible array locations
-            dynamic fallbackArray = responseData['bookings'] ?? 
-                                   responseData['results'] ??
-                                   responseData;
-            
+            dynamic fallbackArray =
+                responseData['bookings'] ??
+                responseData['results'] ??
+                responseData;
+
             if (fallbackArray is List) {
-              print('Processing ${fallbackArray.length} raw bookings from fallback location');
+              print(
+                'Processing ${fallbackArray.length} raw bookings from fallback location',
+              );
               for (var booking in fallbackArray) {
                 if (booking is Map<String, dynamic>) {
                   fetchedBookings.add(_processBookingData(booking));
@@ -162,7 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
         } else if (responseData is List) {
-          print('Processing ${responseData.length} raw bookings from direct array');
+          print(
+            'Processing ${responseData.length} raw bookings from direct array',
+          );
           for (var booking in responseData) {
             if (booking is Map<String, dynamic>) {
               fetchedBookings.add(_processBookingData(booking));
@@ -181,7 +173,6 @@ class _HomeScreenState extends State<HomeScreen> {
         if (fetchedBookings.isNotEmpty) {
           print('Sample processed booking: ${fetchedBookings.first}');
         }
-
       } else {
         print('API returned error: ${result['error']}');
         setState(() {
@@ -209,69 +200,85 @@ class _HomeScreenState extends State<HomeScreen> {
     print('\n🔍 === PROCESSING BOOKING DATA ===');
     print('Raw booking keys: ${booking.keys.toList()}');
     print('Raw booking data: $booking');
-    
+
     // Extract booking ID
-    String bookingId = booking['_id']?.toString() ?? booking['id']?.toString() ?? '';
+    String bookingId =
+        booking['_id']?.toString() ?? booking['id']?.toString() ?? '';
     print('📋 Booking ID: $bookingId');
-    
+
     // Parse customer information with detailed debugging
     String clientName = 'Unknown Client';
     String clientId = '';
     String clientPhone = '';
-    
-    var customerData = booking['customerId'] ?? booking['customer'] ?? booking['client'];
+
+    var customerData =
+        booking['customerId'] ?? booking['customer'] ?? booking['client'];
     print('👤 Customer data: $customerData (${customerData.runtimeType})');
-    
+
     if (customerData is Map<String, dynamic>) {
       print('👤 Customer is Map with keys: ${customerData.keys.toList()}');
-      
+
       // Extract client name
       String? fullName = customerData['fullName']?.toString();
       String? name = customerData['name']?.toString();
       clientName = fullName ?? name ?? 'Unknown Client';
       print('👤 Client name extracted: $clientName');
-      
+
       // Extract client ID
       String? customerId = customerData['_id']?.toString();
       String? id = customerData['id']?.toString();
       clientId = customerId ?? id ?? '';
       print('👤 Client ID extracted: $clientId');
-      
+
       // Extract phone number
       String? phoneNumber = customerData['phoneNumber']?.toString();
       String? phone = customerData['phone']?.toString();
       String? mobile = customerData['mobile']?.toString();
       clientPhone = phoneNumber ?? phone ?? mobile ?? '';
       print('👤 Client phone extracted: $clientPhone');
-      
     } else if (customerData is String) {
       clientId = customerData;
       clientName = 'Client $clientId';
       print('👤 Customer data is string: $customerData');
     } else {
-      print('❌ Customer data is neither Map nor String: ${customerData.runtimeType}');
+      print(
+        '❌ Customer data is neither Map nor String: ${customerData.runtimeType}',
+      );
     }
 
-    // Parse date and time with detailed debugging
     print('📅 Processing date and time...');
     String formattedDate = 'No Date';
     String formattedTime = 'No Time';
     String displayDate = 'No Date';
     DateTime? meetDateTime;
-    
+
     String? meetDateStr = booking['meetDate']?.toString();
     print('📅 Raw meetDate: $meetDateStr');
-    
+
     if (meetDateStr != null && meetDateStr.isNotEmpty) {
       try {
         meetDateTime = DateTime.parse(meetDateStr);
-        formattedDate = '${meetDateTime.day.toString().padLeft(2, '0')}/${meetDateTime.month.toString().padLeft(2, '0')}/${meetDateTime.year}';
-        
+        formattedDate =
+            '${meetDateTime.day.toString().padLeft(2, '0')}/${meetDateTime.month.toString().padLeft(2, '0')}/${meetDateTime.year}';
+
         // Create display date like "12 Aug 2025"
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        displayDate = '${meetDateTime.day} ${months[meetDateTime.month - 1]} ${meetDateTime.year}';
-        
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
+        displayDate =
+            '${meetDateTime.day} ${months[meetDateTime.month - 1]} ${meetDateTime.year}';
+
         print('📅 Parsed date successfully: $displayDate');
       } catch (e) {
         print('❌ Date parsing error for $meetDateStr: $e');
@@ -279,40 +286,48 @@ class _HomeScreenState extends State<HomeScreen> {
         displayDate = meetDateStr;
       }
     }
-    
+
     String? meetTimeStr = booking['meetTime']?.toString();
     print('🕐 Raw meetTime: $meetTimeStr');
-    
+
     if (meetTimeStr != null && meetTimeStr.isNotEmpty) {
       formattedTime = meetTimeStr;
       print('🕐 Formatted time: $formattedTime');
     }
 
     // Extract meeting link with debugging
-    String meetingLink = booking['meetLink']?.toString() ?? 
-                        booking['link']?.toString() ?? 
-                        booking['meetingLink']?.toString() ?? '';
+    String meetingLink =
+        booking['meetLink']?.toString() ??
+        booking['link']?.toString() ??
+        booking['meetingLink']?.toString() ??
+        '';
     print('🔗 Meeting link: $meetingLink');
 
     // Determine booking status and type
-    String status = booking['meetStatus']?.toString() ?? 'pending';
+    // Normalize status consistently
+    String rawStatus =
+        booking['meetStatus']?.toString() ??
+        booking['status']?.toString() ??
+        'pending';
+    String status = _normalizeStatus(rawStatus);
     bool isFinished = booking['finished'] ?? false;
     String type = isFinished ? 'Completed' : 'Video Meeting';
     print('📊 Status: $status, Finished: $isFinished, Type: $type');
-    
+
     // Handle price/amount
-    String price = booking['price']?.toString() ?? 
-                 booking['amount']?.toString() ?? 
-                 booking['fee']?.toString() ?? 
-                 booking['charge']?.toString() ?? 
-                 '500';
+    String price =
+        booking['price']?.toString() ??
+        booking['amount']?.toString() ??
+        booking['fee']?.toString() ??
+        booking['charge']?.toString() ??
+        '500';
     print('💰 Price: $price');
 
     // Parse creation date
     DateTime? createdAt;
     String? createdAtStr = booking['createdAt']?.toString();
     print('📝 Raw createdAt: $createdAtStr');
-    
+
     if (createdAtStr != null && createdAtStr.isNotEmpty) {
       try {
         createdAt = DateTime.parse(createdAtStr);
@@ -360,36 +375,61 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> getFilteredBookings() {
     List<Map<String, dynamic>> filtered = bookings;
 
+    // Apply status filter locally (except 'All')
+    final sel = selectedFilter.toLowerCase();
+    if (sel != 'all') {
+      filtered = filtered.where((b) {
+        final st = (b['status'] ?? '').toString().toLowerCase();
+        switch (sel) {
+          case 'completed':
+            return b['finished'] == true || st == 'completed';
+          case 'pending':
+            return st == 'pending';
+          case 'booked':
+            return st == 'booked';
+          case 'confirmed':
+            return st == 'confirmed';
+          case 'cancelled':
+            return st == 'cancelled';
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
     if (searchQuery.isNotEmpty) {
-      filtered = filtered
-          .where(
-            (booking) =>
-                booking['clientName'].toString().toLowerCase().contains(
-                  searchQuery.toLowerCase(),
-                ) ||
-                booking['type'].toString().toLowerCase().contains(
-                  searchQuery.toLowerCase(),
-                ) ||
-                booking['status'].toString().toLowerCase().contains(
-                  searchQuery.toLowerCase(),
-                ),
-          )
-          .toList();
+      final q = searchQuery.toLowerCase();
+      filtered = filtered.where((booking) {
+        return booking['clientName'].toString().toLowerCase().contains(q) ||
+            booking['type'].toString().toLowerCase().contains(q) ||
+            booking['status'].toString().toLowerCase().contains(q);
+      }).toList();
     }
 
     // Sort by date - most recent first
     filtered.sort((a, b) {
       final dateA = a['meetDateTime'] as DateTime?;
       final dateB = b['meetDateTime'] as DateTime?;
-      
+
       if (dateA == null && dateB == null) return 0;
       if (dateA == null) return 1;
       if (dateB == null) return -1;
-      
+
       return dateB.compareTo(dateA);
     });
 
     return filtered;
+  }
+
+  // Normalize backend variants to consistent UI statuses
+  String _normalizeStatus(String status) {
+    final s = status.toLowerCase().trim();
+    if (s.contains('confirm')) return 'confirmed';
+    if (s.contains('book')) return 'booked';
+    if (s.contains('cancel')) return 'cancelled';
+    if (s.contains('complete') || s.contains('finish')) return 'completed';
+    if (s.contains('pend') || s.isEmpty) return 'pending';
+    return s;
   }
 
   Color getStatusColor(String status) {
@@ -431,35 +471,91 @@ class _HomeScreenState extends State<HomeScreen> {
       _showMessage('Meeting link not available', isError: true);
       return;
     }
-
     try {
-      final uri = Uri.parse(link);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await _copyLink(link);
+      String normalized = link.trim();
+      // Ensure scheme
+      if (!normalized.startsWith('http://') &&
+          !normalized.startsWith('https://')) {
+        normalized = 'https://$normalized';
       }
+
+      final meetCodeRegex = RegExp(r'^[a-z]{3}-[a-z]{4}-[a-z]{3}$');
+      if (meetCodeRegex.hasMatch(normalized)) {
+        normalized = 'https://meet.google.com/$normalized';
+      }
+
+      if (normalized.startsWith('https://meet.google.com/') == false &&
+          normalized.contains('-')) {
+        final codeMatch = RegExp(
+          r'([a-z]{3}-[a-z]{4}-[a-z]{3})',
+        ).firstMatch(normalized);
+        if (codeMatch != null) {
+          normalized = 'https://meet.google.com/${codeMatch.group(1)}';
+        }
+      }
+
+      Uri uri = Uri.parse(normalized);
+
+      final isMeet = uri.host.contains('meet.google.com');
+
+      if (isMeet && Platform.isAndroid) {
+        try {
+          final code =
+              RegExp(
+                r'([a-z]{3}-[a-z]{4}-[a-z]{3})',
+              ).firstMatch(normalized)?.group(1) ??
+              '';
+          final meetIntent = AndroidIntent(
+            action: 'action_view',
+            data: normalized,
+            package: 'com.google.android.apps.meetings',
+            arguments: code.isNotEmpty ? {'CODE': code} : null,
+          );
+          await meetIntent.launch();
+          return;
+        } catch (e) {
+          print('Explicit Meet intent failed: $e');
+        }
+      }
+
+      // 2. Try external application (system chooser / associated app)
+      if (await canLaunchUrl(uri)) {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return;
+      }
+
+      // 3. Fallback to in-app browser view (still not copying)
+      if (await canLaunchUrl(uri)) {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.inAppBrowserView,
+        );
+        if (launched) return;
+      }
+
+      _showMessage(
+        'Cannot open meeting link. Please verify it.',
+        isError: true,
+      );
     } catch (e) {
       print('Error launching meeting link: $e');
-      await _copyLink(link);
+      _showMessage('Failed to open meeting link', isError: true);
     }
   }
 
-  Future<void> _copyLink(String link) async {
-    await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) {
-      _showMessage('Meeting link copied to clipboard');
-    }
-  }
+  // Clipboard copy removed as per requirement: always attempt to open link directly
 
   void _showMessage(String message, {bool isError = false}) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: isError 
-            ? ColorConstants.redColor 
-            : ColorConstants.color2E7D7D,
+          backgroundColor: isError
+              ? ColorConstants.redColor
+              : ColorConstants.color2E7D7D,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -498,7 +594,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               SizedBox(height: 20),
-              
+
               // Client Info
               _buildDetailSection('Client Information', [
                 _buildDetailRow('Name', booking['clientName']),
@@ -506,9 +602,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildDetailRow('Phone', booking['clientPhone']),
                 _buildDetailRow('Client ID', booking['clientId']),
               ]),
-              
+
               SizedBox(height: 16),
-              
+
               // Session Info
               _buildDetailSection('Session Details', [
                 _buildDetailRow('Date', booking['displayDate']),
@@ -518,10 +614,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildDetailRow('Fee', '₹${booking['price']}'),
                 _buildDetailRow('Status', booking['status']),
                 if (booking['createdAt'] != null)
-                  _buildDetailRow('Booked On', 
-                    '${booking['createdAt'].day}/${booking['createdAt'].month}/${booking['createdAt'].year}'),
+                  _buildDetailRow(
+                    'Booked On',
+                    '${booking['createdAt'].day}/${booking['createdAt'].month}/${booking['createdAt'].year}',
+                  ),
               ]),
-              
+
               if (booking['notes'].toString().isNotEmpty) ...[
                 SizedBox(height: 16),
                 _buildDetailSection('Notes', [
@@ -535,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ]),
               ],
-              
+
               if (booking['link']?.toString().isNotEmpty == true) ...[
                 SizedBox(height: 20),
                 SizedBox(
@@ -546,7 +644,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       _launchMeetingLink(booking['link']);
                     },
                     icon: Icon(Icons.videocam, color: Colors.white),
-                    label: Text('Join Meeting', style: TextStyle(color: Colors.white)),
+                    label: Text(
+                      'Join Meeting',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFFFF6B35),
                       padding: EdgeInsets.symmetric(vertical: 12),
@@ -602,10 +703,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.black87, fontSize: 14),
             ),
           ),
         ],
@@ -613,6 +711,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _cancelBooking(Map<String, dynamic> booking) async {
     try {
       final result = await _apiService.cancelBooking(booking['id']);
@@ -624,7 +723,10 @@ class _HomeScreenState extends State<HomeScreen> {
         await fetchBookingsData();
       } else {
         if (mounted) {
-          _showMessage(result['error'] ?? 'Failed to cancel booking', isError: true);
+          _showMessage(
+            result['error'] ?? 'Failed to cancel booking',
+            isError: true,
+          );
         }
       }
     } catch (e) {
@@ -637,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _logout() async {
     try {
       print('Logging out...');
-      
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -663,21 +765,19 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       await _authService.clearAuthData();
-      
+
       Navigator.of(context).pop();
-      
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/auth',
-        (Route<dynamic> route) => false,
-      );
-      
+
+      if (mounted) {
+        context.go('/auth');
+      }
     } catch (e) {
       print('Error during logout: $e');
-      
+
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
-      
+
       if (mounted) {
         _showMessage('Error during logout. Please try again.', isError: true);
       }
@@ -766,7 +866,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 'All',
                 'Booked',
-                'Confirmed', 
+                'Confirmed',
                 'Pending',
                 'Completed',
                 'Cancelled',
@@ -885,7 +985,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: getStatusColor(booking['status'].toString()),
                         borderRadius: BorderRadius.circular(20),
@@ -895,37 +998,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: getStatusTextColor(booking['status'].toString()),
+                          color: getStatusTextColor(
+                            booking['status'].toString(),
+                          ),
                           letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ],
                 ),
-                
+
                 SizedBox(height: 4),
-                
+
                 if (booking['clientPhone'].toString().isNotEmpty) ...[
                   Text(
                     booking['clientPhone'].toString(),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                   SizedBox(height: 2),
                 ],
-                
+
                 Text(
                   'Therapist Session',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
-                
+
                 SizedBox(height: 16),
-                
+
                 // Date and Time Row
                 Row(
                   children: [
@@ -960,9 +1059,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                
+
                 SizedBox(height: 8),
-                
+
                 Row(
                   children: [
                     Icon(
@@ -980,11 +1079,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     SizedBox(width: 20),
-                    Icon(
-                      Icons.videocam,
-                      size: 16,
-                      color: Colors.grey.shade600,
-                    ),
+                    Icon(Icons.videocam, size: 16, color: Colors.grey.shade600),
                     SizedBox(width: 8),
                     Text(
                       booking['type'].toString(),
@@ -996,7 +1091,48 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                
+
+                if (booking['link']?.toString().isNotEmpty == true) ...[
+                  SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _launchMeetingLink(booking['link']),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.link,
+                            size: 16,
+                            color: ColorConstants.primaryBrownColor,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              booking['link'],
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: ColorConstants.primaryBrownColor,
+                                decoration: TextDecoration.underline,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
                 if (booking['link']?.toString().isNotEmpty == true) ...[
                   SizedBox(height: 16),
                   Row(
@@ -1006,7 +1142,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: OutlinedButton(
                           onPressed: () {
                             // Add reschedule functionality
-                            _showMessage('Reschedule functionality coming soon');
+                            _showMessage(
+                              'Reschedule functionality coming soon',
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: Colors.brown.shade600),
@@ -1035,9 +1173,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                      
+
                       SizedBox(width: 12),
-                      
+
                       // Join Button
                       Expanded(
                         child: ElevatedButton(
@@ -1107,11 +1245,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade400,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
             SizedBox(height: 16),
             Text(
               'Something went wrong',
@@ -1162,11 +1296,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.calendar_today,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
+            Icon(Icons.calendar_today, size: 64, color: Colors.grey.shade400),
             SizedBox(height: 16),
             Text(
               'No bookings found',
@@ -1178,9 +1308,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 8),
             Text(
-              selectedFilter == 'All'
-                  ? 'Your bookings will appear here when clients book sessions'
-                  : 'No bookings found for "$selectedFilter" status',
+              _emptyMessageForFilter(),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
@@ -1197,5 +1325,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  String _emptyMessageForFilter() {
+    switch (selectedFilter.toLowerCase()) {
+      case 'all':
+        return 'Your bookings will appear here when clients book sessions';
+      case 'booked':
+        return 'No booked sessions yet';
+      case 'confirmed':
+        return 'No confirmed bookings right now';
+      case 'pending':
+        return 'No pending bookings currently';
+      case 'completed':
+        return 'No completed sessions yet';
+      case 'cancelled':
+        return 'No cancelled bookings';
+      default:
+        return 'No bookings found for "$selectedFilter" status';
+    }
   }
 }

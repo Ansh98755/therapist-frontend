@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:therapist_app/core/app_state.dart';
 import 'package:therapist_app/routes/routes.dart';
-import 'package:therapist_app/screens/auth_wrapper.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppState().initialize();
@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Niti Therapist App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -71,8 +71,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthWrapper(),
-      onGenerateRoute: AppRoutes.generateRoute,
+      routerConfig: appRouter,
     );
   }
 }

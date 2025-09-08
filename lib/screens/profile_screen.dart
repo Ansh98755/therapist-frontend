@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
 import 'package:therapist_app/screens/profileedit.dart';
@@ -168,9 +169,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       Navigator.of(context).pop();
 
-      Navigator.of(
-        context,
-      ).pushNamedAndRemoveUntil('/auth', (Route<dynamic> route) => false);
+      if (mounted) {
+        context.go('/auth');
+      }
     } catch (e) {
       print('Error during logout: $e');
 
@@ -243,8 +244,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     if (isLoading) {
       return Scaffold(
         backgroundColor: Colors.grey.shade50,
