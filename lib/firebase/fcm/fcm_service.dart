@@ -27,7 +27,7 @@ class FCMService {
 
     // 4. Foreground message listener
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("≡ƒô⌐ Foreground message: ${message.notification?.title}");
+      print(" Foreground message: ${message.notification?.title}");
       _showNotification(
         message.notification?.title ?? "No Title",
         message.notification?.body ?? "No Body",
@@ -36,7 +36,7 @@ class FCMService {
 
     // 5. Background message listener (when app is in background but not terminated)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("≡ƒô⌐ Background message clicked: ${message.notification?.title}");
+      print(" Background message clicked: ${message.notification?.title}");
       // Handle navigation when user taps notification
     });
 
@@ -45,7 +45,7 @@ class FCMService {
         .getInitialMessage();
     if (initialMessage != null) {
       print(
-        "≡ƒô⌐ App opened from terminated state: ${initialMessage.notification?.title}",
+        " App opened from terminated state: ${initialMessage.notification?.title}",
       );
       // _handleNotificationNavigation(initialMessage);
       // Handle navigation here too
@@ -53,14 +53,14 @@ class FCMService {
 
     // Background tap
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("≡ƒô⌐ Background notification clicked");
+      print(" Background notification clicked");
       // _handleNotificationNavigation(message);
     });
 
-    // 7. Token Refresh Listener Γ£à
+    // 7. Token Refresh Listener
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       print("FCM Token refreshed: $newToken");
-
+      
       // await SharedPrefsHelper.setFCMToken(newToken);
 
       // String? token = await SharedPrefsHelper.getToken();

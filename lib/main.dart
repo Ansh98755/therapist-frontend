@@ -26,8 +26,6 @@ void main() async {
       ),
     );
     await FCMService().initFCM();
-    String? fcmToken = await FCMService().getFcmToken();
-    print("Fcm Token for testing notification ${fcmToken}");
 
     print("Firebase initialized successfully");
   } catch (e) {

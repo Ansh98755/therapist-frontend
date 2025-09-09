@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
+import 'package:therapist_app/core/shared_pref.dart';
+import 'package:therapist_app/firebase/fcm/fcm_service.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class NitiAuthScreen extends StatefulWidget {
@@ -115,6 +120,34 @@ class _NitiAuthScreenState extends State<NitiAuthScreen>
 
           // Save auth data
           final saveSuccess = await _authService.saveAuthData(token, userData);
+
+          String? fcmToken = await FCMService().getFcmToken();
+          print("token before calling fcm token endpoint $token");
+          print(userData);
+          if (fcmToken != null) {
+            try {
+              final response = await http.post(
+                Uri.parse(
+                  "https://niti.nexuserp.co.in/api/verifyTherapistToken",
+                ),
+                headers: {
+                  "Content-Type": "application/json",
+                  'Authorization': 'Bearer $token',
+                },
+                body: jsonEncode({"new_token": fcmToken}),
+              );
+
+              if (response.statusCode == 200) {
+                print(" Token updated successfully: ${response.body}");
+              } else {
+                print(
+                  " Failed to update token. Status: ${response.statusCode}, Body: ${response.body}",
+                );
+              }
+            } catch (e) {
+              print(" Error sending token to backend: $e");
+            }
+          }
 
           if (saveSuccess) {
             print('=== LOGIN SUCCESS ===');
