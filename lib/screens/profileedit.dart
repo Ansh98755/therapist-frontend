@@ -53,6 +53,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         'fullname',
       ); // API uses 'fullname'
       _genderController.text = _getFieldValue(data, 'gender');
+      print("gender selected data ${_genderController.text}");
       _meetLinkController.text = _getFieldValue(data, 'meetLink');
       _experienceController.text = _getFieldValue(data, 'experience');
 
@@ -150,42 +151,44 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<bool> _updateProfilePicture() async {
-  if (_selectedImage == null) return false;
+    if (_selectedImage == null) return false;
 
-  try {
-    print('Updating profile picture...');
-    final result = await _apiService.updateUserProfilePicture(_selectedImage!);
+    try {
+      print('Updating profile picture...');
+      final result = await _apiService.updateUserProfilePicture(
+        _selectedImage!,
+      );
 
-    print('Profile picture update result: $result');
+      print('Profile picture update result: $result');
 
-    if (result['success'] == true) {
-      // Update current profile picture URL if provided in response
-      if (result['data'] != null) {
-        final responseData = result['data'];
-        if (responseData is Map<String, dynamic>) {
-          final newPictureUrl = responseData['profile_picture'] ?? 
-                               responseData['pictureUrl'] ?? 
-                               responseData['profilePicture'];
-          if (newPictureUrl != null) {
-            setState(() {
-              _currentProfilePicture = newPictureUrl.toString();
-              _selectedImage = null; // Clear selected image
-            });
+      if (result['success'] == true) {
+        // Update current profile picture URL if provided in response
+        if (result['data'] != null) {
+          final responseData = result['data'];
+          if (responseData is Map<String, dynamic>) {
+            final newPictureUrl =
+                responseData['profile_picture'] ??
+                responseData['pictureUrl'] ??
+                responseData['profilePicture'];
+            if (newPictureUrl != null) {
+              setState(() {
+                _currentProfilePicture = newPictureUrl.toString();
+                _selectedImage = null; // Clear selected image
+              });
+            }
           }
         }
+        return true;
+      } else {
+        _showError(result['error'] ?? 'Failed to update profile picture');
+        return false;
       }
-      return true;
-    } else {
-      _showError(result['error'] ?? 'Failed to update profile picture');
+    } catch (e) {
+      print('Error updating profile picture: $e');
+      _showError('Error updating profile picture: $e');
       return false;
     }
-  } catch (e) {
-    print('Error updating profile picture: $e');
-    _showError('Error updating profile picture: $e');
-    return false;
   }
-}
-
 
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
@@ -203,7 +206,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
 
       print('Updating therapist profile...');
-
+      
       // Prepare data for profile update - using correct API field names
       final result = await _apiService.updateTherapistProfile(
         fullName: _fullNameController.text.trim().isEmpty
@@ -684,6 +687,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           onChanged: (String? newValue) {
             setState(() {
               controller.text = newValue ?? '';
+              print("selected gender ${controller.text}");
+              _genderController.text = controller.text;
             });
           },
         ),
