@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:therapist_app/core/api_service.dart';
 import 'package:therapist_app/core/authservices.dart';
-import 'package:therapist_app/screens/profileedit.dart';
+import 'package:therapist_app/screens/profile_edit.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class ProfileScreen extends StatefulWidget {
