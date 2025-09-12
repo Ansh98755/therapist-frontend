@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -10,14 +9,12 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  // Updated analytics data structure
   Map<String, dynamic> analyticsData = {
     'bookingCount': 287,
     'totalIncomeBeforeShare': 150000.0,
     'companyShareHaveToPay': 25000.0,
     'finalIncome': 125000.0,
     'totalCancellation': 23,
-    // Weekly total calculations for graph (last 7 days)
     'weeklyTotals': [
       {'day': 'Mon', 'total': 18000},
       {'day': 'Tue', 'total': 22000},
@@ -336,92 +333,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          SizedBox(
-            height: 200,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: 35000,
-                gridData: FlGridData(
-                  show: true,
-                  drawHorizontalLine: true,
-                  horizontalInterval: 10000,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: ColorConstants.grey.withOpacity(0.2),
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            analyticsData['weeklyTotals'][value.toInt()]['day'],
-                            style: TextStyle(
-                              color: ColorConstants.grey,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 45,
-                      interval: 10000,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          '${(value / 1000).toInt()}k',
-                          style: TextStyle(
-                            color: ColorConstants.grey,
-                            fontSize: 11,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                barGroups: List.generate(
-                  analyticsData['weeklyTotals'].length,
-                  (index) => BarChartGroupData(
-                    x: index,
-                    barRods: [
-                      BarChartRodData(
-                        toY: analyticsData['weeklyTotals'][index]['total'].toDouble(),
-                        color: ColorConstants.primaryOrangeColor,
-                        width: 28,
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: LinearGradient(
-                          colors: [
-                            ColorConstants.primaryOrangeColor,
-                            ColorConstants.primaryOrangeColor.withOpacity(0.7),
-                          ],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

@@ -1,13 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:therapist_app/core/app_state.dart';
 import 'package:therapist_app/firebase/fcm/fcm_service.dart';
 import 'package:therapist_app/firebase/firebase_config.dart';
-import 'package:therapist_app/routes/routes.dart';
+import 'package:therapist_app/routes/app_routing.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
-
+import 'api_services/app_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,12 +27,13 @@ void main() async {
       ),
     );
     await FCMService().initFCM();
-
     print("Firebase initialized successfully");
   } catch (e) {
     print("Error initializing Firebase: $e");
   }
+
   await AppState().initialize();
+
   runApp(const MyApp());
 }
 
@@ -99,7 +99,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      routerConfig: appRouter,
+      routerConfig: AppRouting.appRouter,
     );
   }
 }

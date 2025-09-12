@@ -1,7 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:therapist_app/core/authservices.dart';
 import 'dart:io';
+
+import 'auth_services.dart';
 
 class ApiService {
   static const String baseUrl = "https://niti.nexuserp.co.in/api";

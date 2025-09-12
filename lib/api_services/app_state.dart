@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:therapist_app/core/authservices.dart';
 
+import 'auth_services.dart';
 class AppState {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;

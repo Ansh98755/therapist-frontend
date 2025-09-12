@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:therapist_app/core/api_service.dart';
-import 'package:therapist_app/core/authservices.dart';
+import 'package:therapist_app/api_services/api_service.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 import 'dart:io';
 import 'dart:convert';
+
+import '../../api_services/auth_services.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
