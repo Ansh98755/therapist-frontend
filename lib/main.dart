@@ -7,6 +7,8 @@ import 'package:therapist_app/firebase/firebase_config.dart';
 import 'package:therapist_app/routes/routes.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
+
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {

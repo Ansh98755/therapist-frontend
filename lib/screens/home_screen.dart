@@ -383,12 +383,12 @@ class _HomeScreenState extends State<HomeScreen> {
         switch (sel) {
           case 'completed':
             return b['finished'] == true || st == 'completed';
-          case 'pending':
-            return st == 'pending';
+          case 'ongoing':
+            return st == 'ongoing';
           case 'booked':
             return st == 'booked';
-          case 'confirmed':
-            return st == 'confirmed';
+          case 'rescheduled':
+            return st == 'rescheduled';
           case 'cancelled':
             return st == 'cancelled';
           default:
@@ -424,11 +424,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // Normalize backend variants to consistent UI statuses
   String _normalizeStatus(String status) {
     final s = status.toLowerCase().trim();
-    if (s.contains('confirm')) return 'confirmed';
+    if (s.contains('ongoing')) return 'ongoing';
     if (s.contains('book')) return 'booked';
     if (s.contains('cancel')) return 'cancelled';
     if (s.contains('complete') || s.contains('finish')) return 'completed';
-    if (s.contains('pend') || s.isEmpty) return 'pending';
+    if (s.contains('rescheduled') || s.isEmpty) return 'rescheduled';
     return s;
   }
 
@@ -436,9 +436,9 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (status.toLowerCase()) {
       case 'booked':
         return Color(0xFFE8F5E8); // Light green
-      case 'confirmed':
+      case 'rescheduled':
         return Color(0xFFE3F2FD); // Light blue
-      case 'pending':
+      case 'ongoing':
         return Color(0xFFFFF3E0); // Light orange
       case 'cancelled':
         return Color(0xFFFFEBEE); // Light red
@@ -453,9 +453,9 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (status.toLowerCase()) {
       case 'booked':
         return Color(0xFF2E7D32); // Dark green
-      case 'confirmed':
+      case 'rescheduled':
         return Color(0xFF1976D2); // Dark blue
-      case 'pending':
+      case 'ongoing':
         return Color(0xFFE65100); // Dark orange
       case 'cancelled':
         return Color(0xFFC62828); // Dark red
@@ -866,8 +866,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 'All',
                 'Booked',
-                'Confirmed',
-                'Pending',
+                'Rescheduled',
+                'OnGoing',
                 'Completed',
                 'Cancelled',
               ].map((filter) => _buildFilterChip(filter)).toList(),
@@ -1341,6 +1341,11 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'No completed sessions yet';
       case 'cancelled':
         return 'No cancelled bookings';
+      case 'ongoing':
+        return 'No ongoing bookings';
+      case 'rescheduled':
+        return 'No rescheduled bookings';
+
       default:
         return 'No bookings found for "$selectedFilter" status';
     }
