@@ -4,6 +4,7 @@ import 'package:therapist_app/home_page.dart';
 import 'package:therapist_app/screens/auth_screen.dart';
 import 'package:therapist_app/screens/auth_wrapper.dart';
 import 'package:therapist_app/screens/community_screen.dart';
+import 'package:therapist_app/screens/forgot_password.dart';
 import 'package:therapist_app/screens/post_details_screen.dart';
 
 class AppRouteNames {
