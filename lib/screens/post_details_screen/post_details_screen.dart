@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/screens/community_screen.dart';
+import 'package:therapist_app/screens/community_screen/community_screen.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
-
-class PostDetailsScreen extends StatelessWidget {
-
+class PostDetailsScreen extends StatelessWidget
+{
 final CommunityPost post;
-
   const PostDetailsScreen({super.key, required this.post});
 
   @override

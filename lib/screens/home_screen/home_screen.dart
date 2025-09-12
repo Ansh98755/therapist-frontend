@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
-import 'package:therapist_app/core/api_service.dart';
-import 'package:therapist_app/core/authservices.dart';
+import 'package:therapist_app/api_services/api_service.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' show Platform;
 import 'package:android_intent_plus/android_intent.dart';
+
+import '../../api_services/auth_services.dart';
+
 
 class HomeScreen extends StatefulWidget {
   @override

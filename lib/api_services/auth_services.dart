@@ -1,12 +1,11 @@
 // Removed direct SharedPreferences usage; handled by SharedPrefService
-import 'package:therapist_app/core/shared_pref.dart';
 import 'dart:convert';
 import 'dart:async';
 
-class AuthService {
-  // Keys now managed inside SharedPrefService. Kept only if other modules depend.
+import '../core/shared_pref.dart';
 
-  // Stream controller for auth state changes
+class AuthService {
+
   static final StreamController<bool> _authStateController =
       StreamController<bool>.broadcast(
         onListen: () async {

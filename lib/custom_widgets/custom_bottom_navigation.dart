@@ -1,27 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:therapist_app/screens/analytics_Screen.dart';
-import 'package:therapist_app/screens/community_screen.dart';
-import 'package:therapist_app/screens/home_screen.dart';
-import 'package:therapist_app/screens/profile_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:therapist_app/routes/app_routing.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class CustomBottomNavigation extends StatefulWidget {
+  final Widget child; // 👈 Add this
+
+  const CustomBottomNavigation({super.key, required this.child});
 
   @override
-  State<HomePage> createState() => _HomePageState(); 
+  State<CustomBottomNavigation> createState() => _CustomBottomNavigationState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _CustomBottomNavigationState extends State<CustomBottomNavigation> {
   int _currentIndex = 0;
-  final PageController _pageController = PageController();
-
-  final List<Widget> _screens = [
-    HomeScreen(),
-    AnalyticsScreen(),
-    CommunityScreen(),
-    ProfileScreen(),
-  ];
 
   final List<BottomNavigationBarItem> _navItems = [
     const BottomNavigationBarItem(
@@ -46,37 +38,24 @@ class _HomePageState extends State<HomePage> {
     ),
   ];
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
+  final List<AppRouteEnum> _routes = [
+    AppRouteEnum.homeScreen,
+    AppRouteEnum.analyticsScreen,
+    AppRouteEnum.communityScreen,
+    AppRouteEnum.profileScreen,
+  ];
 
   void _onTabTapped(int index) {
     setState(() {
       _currentIndex = index;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-  }
-
-  void _onPageChanged(int index) {
-    setState(() {
-      _currentIndex = index;
-    });
+    context.go(_routes[index].path); // ✅ navigation via GoRouter
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: _onPageChanged,
-        children: _screens,
-      ),
+      body: widget.child, // 👈 render current active screen
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
