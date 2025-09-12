@@ -383,8 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
         switch (sel) {
           case 'completed':
             return b['finished'] == true || st == 'completed';
-          case 'ongoing':
-            return st == 'ongoing';
+
           case 'booked':
             return st == 'booked';
           case 'rescheduled':
@@ -424,7 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Normalize backend variants to consistent UI statuses
   String _normalizeStatus(String status) {
     final s = status.toLowerCase().trim();
-    if (s.contains('ongoing')) return 'ongoing';
+
     if (s.contains('book')) return 'booked';
     if (s.contains('cancel')) return 'cancelled';
     if (s.contains('complete') || s.contains('finish')) return 'completed';
@@ -438,8 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Color(0xFFE8F5E8); // Light green
       case 'rescheduled':
         return Color(0xFFE3F2FD); // Light blue
-      case 'ongoing':
-        return Color(0xFFFFF3E0); // Light orange
+
       case 'cancelled':
         return Color(0xFFFFEBEE); // Light red
       case 'completed':
@@ -454,9 +452,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'booked':
         return Color(0xFF2E7D32); // Dark green
       case 'rescheduled':
-        return Color(0xFF1976D2); // Dark blue
-      case 'ongoing':
-        return Color(0xFFE65100); // Dark orange
+        return Color.fromRGBO(25, 118, 210, 1); // Dark blue
+
       case 'cancelled':
         return Color(0xFFC62828); // Dark red
       case 'completed':
@@ -867,7 +864,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 'All',
                 'Booked',
                 'Rescheduled',
-                'OnGoing',
+
                 'Completed',
                 'Cancelled',
               ].map((filter) => _buildFilterChip(filter)).toList(),
@@ -1341,8 +1338,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'No completed sessions yet';
       case 'cancelled':
         return 'No cancelled bookings';
-      case 'ongoing':
-        return 'No ongoing bookings';
       case 'rescheduled':
         return 'No rescheduled bookings';
 
