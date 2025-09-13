@@ -107,6 +107,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void _initializeData() {
     if (widget.initialData != null) {
       final data = widget.initialData!;
+      print("data  $data");
+      // Get the raw qualifications
+      dynamic qualificationsData = data['qualifications'];
+      print("Raw qualifications data: $qualificationsData");
+      print("Type of qualificationsData: ${qualificationsData.runtimeType}");
+
+      // Flatten and set the controller once
+      _qualificationsController.text = _parseNestedListField(
+        qualificationsData,
+      );
+      print(
+        "Data of qualification after flattening: ${_qualificationsController.text}",
+      );
 
       _fullNameController.text = _getFieldValue(data, 'fullName', 'fullname');
       _genderController.text = _getFieldValue(data, 'gender');
@@ -115,7 +128,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       _expertiseController.text = _formatListField(data, 'expertise');
       _languagesController.text = _formatListField(data, 'languages');
-      _qualificationsController.text = _getFieldValue(data, 'qualifications');
 
       _chargeController.text = _getFieldValue(data, 'charge');
       _messageController.text = _getFieldValue(data, 'message');
@@ -258,6 +270,99 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     } catch (e) {
       _showError('Error updating profile picture: $e');
       return false;
+    }
+  }
+
+  // Flatten any nested list into a comma-separated string
+  /// Parses nested list-like structures coming either as actual List objects
+  /// or as Strings that look like bracketed lists (e.g. "[[MA]]") and returns
+  /// a comma-separated String like "MA, PhD".
+  String _parseNestedListField(dynamic fieldData) {
+    // Helper: split top-level comma-separated items inside a bracketed string.
+    List<String> _splitTopLevel(String s) {
+      final List<String> parts = [];
+      final sb = StringBuffer();
+      int bracket = 0;
+
+      for (int i = 0; i < s.length; i++) {
+        final ch = s[i];
+        if (ch == '[') {
+          bracket++;
+          sb.write(ch);
+        } else if (ch == ']') {
+          bracket--;
+          sb.write(ch);
+        } else if (ch == ',' && bracket == 0) {
+          parts.add(sb.toString());
+          sb.clear();
+        } else {
+          sb.write(ch);
+        }
+      }
+
+      if (sb.isNotEmpty) parts.add(sb.toString());
+      return parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    }
+
+    // Normalize single token: remove surrounding quotes if present, trim whitespace
+    String _normalizeToken(String token) {
+      var t = token.trim();
+      if ((t.startsWith('"') && t.endsWith('"')) ||
+          (t.startsWith("'") && t.endsWith("'"))) {
+        t = t.substring(1, t.length - 1);
+      }
+      return t;
+    }
+
+    // Recursive flatten function that handles Lists and Strings (including bracketed strings)
+    List<String> _flatten(dynamic data) {
+      if (data == null) return [];
+
+      // If it's already a List, recurse into each item
+      if (data is List) {
+        final List<String> out = [];
+        for (var item in data) {
+          out.addAll(_flatten(item));
+        }
+        return out;
+      }
+
+      // If it's a string that looks like a bracketed list "[...]", parse its contents
+      if (data is String) {
+        final s = data.trim();
+        if (s.startsWith('[') && s.endsWith(']')) {
+          // remove outer [ ]
+          final inner = s.substring(1, s.length - 1);
+          // split top-level items (handles nested brackets)
+          final parts = _splitTopLevel(inner);
+          final List<String> out = [];
+          for (var p in parts) {
+            // recursively flatten each part (in case of nested brackets)
+            out.addAll(_flatten(p));
+          }
+          return out;
+        }
+
+        // Plain string token (no brackets) — normalize and return
+        return [_normalizeToken(s)];
+      }
+
+      // Fallback: convert other value types to string
+      return [data.toString()];
+    }
+
+    try {
+      final flatList = _flatten(fieldData);
+      // remove empties and duplicates if you want:
+      final cleaned = flatList
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      print("Flattened qualifications: $cleaned"); // debug
+      return cleaned.join(', ');
+    } catch (e) {
+      print("Error flattening fieldData: $e");
+      return '';
     }
   }
 

@@ -1,3 +1,5 @@
+import 'dart:convert' show json;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:therapist_app/api_services/api_service.dart';
@@ -542,29 +544,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         '₹${_getFieldValue('charge')}',
                       ),
                     if (_getFieldValue('availability') != 'Not Available')
-                      _buildInfoRow(
+                      _buildInfoRowWidget(
                         Icons.schedule,
                         'Availability',
-                        _getFieldValue('availability'),
+                        buildAvailabilitySlots(_getFieldValue('availability')),
                       )
                     else
-                      _buildInfoRow(
+                      _buildInfoRowWidget(
                         Icons.schedule,
                         'Availability',
-                        'Please set your availability',
-                        isEmpty: true,
+                        Text(
+                          'Please set your availability',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.orange.shade600,
+                          ),
+                        ),
                       ),
+
                     if (_getFieldValue('qualifications') != 'Not Available')
-                      _buildInfoRow(
+                      _buildInfoRowWidget(
                         Icons.school,
                         'Qualifications',
-                        _getFieldValue('qualifications'),
+                        buildQualificationsChips(
+                          _getFieldValue('qualifications'),
+                        ),
                       )
                     else
                       _buildInfoRow(
                         Icons.school,
-                        'Qualifications',
-                        'Please add your qualifications',
+                        'Qualification',
+                        'Please specify your qualification',
                         isEmpty: true,
                       ),
                   ]),
@@ -693,6 +703,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget buildAvailabilitySlots(dynamic availabilityData) {
+    Map<String, List<String>> availability = {};
+
+    try {
+      if (availabilityData is Map<String, dynamic>) {
+        // Already in map form
+        availability = availabilityData.map((key, value) {
+          final times = List<String>.from(value);
+          return MapEntry(key, times);
+        });
+      } else if (availabilityData is String) {
+        String data = availabilityData.trim();
+
+        // Example format: {Tuesday: [11:00, 12:00], Wednesday: [11:00]}
+        // Remove outer braces
+        if (data.startsWith('{') && data.endsWith('}')) {
+          data = data.substring(1, data.length - 1); // remove {}
+
+          // Split by commas not inside brackets
+          final entries = data.split(RegExp(r',(?![^\[]*\])'));
+
+          for (var entry in entries) {
+            final parts = entry.split(':');
+            if (parts.length >= 2) {
+              final day = parts[0].trim();
+              String timesPart = parts.sublist(1).join(':').trim();
+
+              // Remove brackets []
+              if (timesPart.startsWith('[') && timesPart.endsWith(']')) {
+                timesPart = timesPart.substring(1, timesPart.length - 1);
+              }
+
+              // Split times
+              final times = timesPart.split(',').map((t) => t.trim()).toList();
+
+              availability[day] = times;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("Error parsing availability: $e");
+      return Text('Invalid availability data');
+    }
+
+    if (availability.isEmpty) {
+      return Text('No availability set');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: availability.entries.map((entry) {
+        final day = entry.key;
+        final times = entry.value;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                day,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: times.map((time) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Chip(
+                        label: Text(time, style: TextStyle(fontSize: 14)),
+
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildInfoRow(
     IconData icon,
     String label,
@@ -768,6 +871,104 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoRowWidget(
+    IconData icon,
+    String label,
+    Widget valueWidget, {
+    bool isEmpty = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isEmpty ? Colors.orange.shade50 : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isEmpty ? Colors.orange.shade600 : Colors.brown.shade600,
+            ),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 4),
+                valueWidget,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildQualificationsChips(dynamic qualificationsData) {
+    List<String> qualifications = [];
+
+    try {
+      List<dynamic> parsedData = [];
+
+      if (qualificationsData is String) {
+        String data = qualificationsData.trim();
+
+        // Handle different patterns: [["id", "kl"]], [["id"]], ["id"]
+        if (data.startsWith('[[') && data.endsWith(']]')) {
+          data = data.substring(2, data.length - 2); // remove outer brackets
+          parsedData = data.split(',').map((e) => e.trim()).toList();
+        } else if (data.startsWith('[') && data.endsWith(']')) {
+          data = data.substring(1, data.length - 1);
+          parsedData = data.split(',').map((e) => e.trim()).toList();
+        }
+      } else if (qualificationsData is List) {
+        parsedData = qualificationsData;
+      }
+
+      // Map parsedData to strings
+      qualifications = parsedData.map((item) {
+        if (item is List && item.isNotEmpty) {
+          return item[1 >= item.length ? 0 : 1]
+              .toString(); // fallback to first if second not present
+        } else if (item is String) {
+          return item;
+        } else {
+          return item.toString();
+        }
+      }).toList();
+    } catch (e) {
+      print("Error parsing qualifications: $e");
+      qualifications = ['Invalid data format'];
+    }
+
+    if (qualifications.isEmpty) {
+      qualifications.add('No qualifications available');
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: qualifications.map((q) {
+        return Chip(
+          label: Text(q, style: TextStyle(fontSize: 14, color: Colors.black87)),
+        );
+      }).toList(),
     );
   }
 
