@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+
 class SharedPrefService {
   SharedPrefService._internal();
   static final SharedPrefService _instance = SharedPrefService._internal();
@@ -10,11 +11,16 @@ class SharedPrefService {
   static const String _lastLoginTimeKey = 'last_login_time';
   static const String _tokenExpiryKey = 'token_expiry';
 
+  // New key for therapist fullname
+  static const String _fullNameKey = 'therapist_fullname';
+
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
 
   Future<bool> setString(String key, String value) async =>
       (await _prefs).setString(key, value);
+
   Future<String?> getString(String key) async => (await _prefs).getString(key);
+
   Future<void> remove(String key) async => (await _prefs).remove(key);
 
   Future<void> saveToken(String token) async {
@@ -61,5 +67,16 @@ class SharedPrefService {
     await p.remove(_userDataKey);
     await p.remove(_lastLoginTimeKey);
     await p.remove(_tokenExpiryKey);
+    await p.remove(_fullNameKey); // Clear fullname too
+  }
+
+  // === New methods for therapist full name ===
+
+  Future<void> saveFullName(String fullName) async {
+    await setString(_fullNameKey, fullName);
+  }
+
+  Future<String?> getFullName() async {
+    return getString(_fullNameKey);
   }
 }

@@ -1,8 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'package:therapist_app/firebase/fcm/fcm_service.dart';
 import 'package:therapist_app/firebase/firebase_config.dart';
+import 'package:therapist_app/providers/bookings_provider.dart';
 import 'package:therapist_app/routes/app_routing.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
@@ -34,7 +36,14 @@ void main() async {
 
   await AppState().initialize();
 
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => BookingsProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

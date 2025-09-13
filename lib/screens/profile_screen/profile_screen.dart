@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:therapist_app/api_services/api_service.dart';
+import 'package:therapist_app/core/shared_pref.dart';
 import 'package:therapist_app/screens/profile_screen/profile_edit.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
@@ -61,7 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Process and normalize the data according to actual API response structure
         final processedData = _processProfileData(extractedData);
-
+        await SharedPrefService().saveFullName(processedData['fullname'] ?? '');
         setState(() {
           profileData = processedData;
           isLoading = false;
