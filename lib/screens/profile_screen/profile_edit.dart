@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:therapist_app/api_services/api_service.dart';
+import 'package:therapist_app/utils/color_constants/availability_constants.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -39,65 +40,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   String? _currentProfilePicture;
 
   // Availability data - now stores selected time slots for each day
-  Map<String, Set<String>> _availability = {
-    'Monday': <String>{},
-    'Tuesday': <String>{},
-    'Wednesday': <String>{},
-    'Thursday': <String>{},
-    'Friday': <String>{},
-    'Saturday': <String>{},
-    'Sunday': <String>{},
-  };
+  final Map<String, Set<String>> _availability = AvailabilityConstants.weekDays;
 
   // Available time slots based on day type
-  Map<String, List<String>> _timeSlotsByDay = {
-    'Monday': ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"],
-    'Tuesday': ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"],
-    'Wednesday': [
-      "11:00",
-      "12:00",
-      "13:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00",
-    ],
-    'Thursday': ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"],
-    'Friday': ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"],
-    'Saturday': [
-      "10:00",
-      "11:00",
-      "12:00",
-      "13:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00",
-      "18:00",
-      "19:00",
-      "20:00",
-      "21:00",
-      "22:00",
-      "23:00",
-    ],
-    'Sunday': [
-      "10:00",
-      "11:00",
-      "12:00",
-      "13:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00",
-      "18:00",
-      "19:00",
-      "20:00",
-      "21:00",
-      "22:00",
-      "23:00",
-    ],
-  };
-
+  final Map<String, List<String>> _timeSlotsByDay =
+      AvailabilityConstants.timeSlotsByDay;
   @override
   void initState() {
     super.initState();
