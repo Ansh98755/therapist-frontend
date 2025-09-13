@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:therapist_app/api_services/api_service.dart';
+import 'package:therapist_app/utils/profile_edit_constants/availability_constants.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 import 'dart:io';
+import 'dart:convert';
 
 import '../../api_services/auth_services.dart';
 
@@ -30,13 +33,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _languagesController = TextEditingController();
   final _qualificationsController = TextEditingController();
   final _chargeController = TextEditingController();
-  final _availabilityController = TextEditingController();
   final _messageController = TextEditingController();
 
   bool _isLoading = false;
   File? _selectedImage;
   String? _currentProfilePicture;
 
+  // Availability data - now stores selected time slots for each day
+  final Map<String, Set<String>> _availability = AvailabilityConstants.weekDays;
+
+  // Available time slots based on day type
+  final Map<String, List<String>> _timeSlotsByDay =
+      AvailabilityConstants.timeSlotsByDay;
   @override
   void initState() {
     super.initState();
@@ -46,27 +54,33 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void _initializeData() {
     if (widget.initialData != null) {
       final data = widget.initialData!;
+      print("data  $data");
+      // Get the raw qualifications
+      dynamic qualificationsData = data['qualifications'];
+      print("Raw qualifications data: $qualificationsData");
+      print("Type of qualificationsData: ${qualificationsData.runtimeType}");
 
-      // Map API response fields to form controllers based on actual API structure
-      _fullNameController.text = _getFieldValue(
-        data,
-        'fullName',
-        'fullname',
-      ); // API uses 'fullname'
+      // Flatten and set the controller once
+      _qualificationsController.text = _parseNestedListField(
+        qualificationsData,
+      );
+      print(
+        "Data of qualification after flattening: ${_qualificationsController.text}",
+      );
+
+      _fullNameController.text = _getFieldValue(data, 'fullName', 'fullname');
       _genderController.text = _getFieldValue(data, 'gender');
       _meetLinkController.text = _getFieldValue(data, 'meetLink');
       _experienceController.text = _getFieldValue(data, 'experience');
 
-      // Handle list fields (expertise, languages)
       _expertiseController.text = _formatListField(data, 'expertise');
       _languagesController.text = _formatListField(data, 'languages');
-      _qualificationsController.text = _getFieldValue(data, 'qualifications');
 
       _chargeController.text = _getFieldValue(data, 'charge');
-      _availabilityController.text = _getFieldValue(data, 'availability');
       _messageController.text = _getFieldValue(data, 'message');
 
-      // Handle profile picture - API uses 'pictureUrl'
+      _parseAvailabilityFromBackend(data);
+
       _currentProfilePicture = _getFieldValue(
         data,
         'profilePicture',
@@ -79,12 +93,35 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
+  void _parseAvailabilityFromBackend(Map<String, dynamic> data) {
+    if (data['availability'] != null && data['availability'] is Map) {
+      final availabilityData = data['availability'] as Map<String, dynamic>;
+
+      availabilityData.forEach((day, slots) {
+        if (_availability.containsKey(day) && slots is List) {
+          _availability[day] = Set<String>.from(slots);
+        }
+      });
+    }
+  }
+
+  Map<String, List<String>> _generateBackendAvailability() {
+    Map<String, List<String>> backendAvailability = {};
+
+    _availability.forEach((day, slots) {
+      if (slots.isNotEmpty) {
+        backendAvailability[day] = slots.toList()..sort();
+      }
+    });
+
+    return backendAvailability;
+  }
+
   String _getFieldValue(
     Map<String, dynamic> data,
     String key, [
     String? alternativeKey,
   ]) {
-    // Try primary key first
     if (data.containsKey(key) &&
         data[key] != null &&
         data[key].toString().isNotEmpty &&
@@ -93,7 +130,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       return data[key].toString();
     }
 
-    // Try alternative key if provided
     if (alternativeKey != null &&
         data.containsKey(alternativeKey) &&
         data[alternativeKey] != null &&
@@ -126,7 +162,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _languagesController.dispose();
     _qualificationsController.dispose();
     _chargeController.dispose();
-    _availabilityController.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -151,42 +186,132 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<bool> _updateProfilePicture() async {
-  if (_selectedImage == null) return false;
+    if (_selectedImage == null) return false;
 
-  try {
-    print('Updating profile picture...');
-    final result = await _apiService.updateUserProfilePicture(_selectedImage!);
+    try {
+      final result = await _apiService.updateUserProfilePicture(
+        _selectedImage!,
+      );
 
-    print('Profile picture update result: $result');
-
-    if (result['success'] == true) {
-      // Update current profile picture URL if provided in response
-      if (result['data'] != null) {
-        final responseData = result['data'];
-        if (responseData is Map<String, dynamic>) {
-          final newPictureUrl = responseData['profile_picture'] ?? 
-                               responseData['pictureUrl'] ?? 
-                               responseData['profilePicture'];
-          if (newPictureUrl != null) {
-            setState(() {
-              _currentProfilePicture = newPictureUrl.toString();
-              _selectedImage = null; // Clear selected image
-            });
+      if (result['success'] == true) {
+        if (result['data'] != null) {
+          final responseData = result['data'];
+          if (responseData is Map<String, dynamic>) {
+            final newPictureUrl =
+                responseData['profile_picture'] ??
+                responseData['pictureUrl'] ??
+                responseData['profilePicture'];
+            if (newPictureUrl != null) {
+              setState(() {
+                _currentProfilePicture = newPictureUrl.toString();
+                _selectedImage = null;
+              });
+            }
           }
         }
+        return true;
+      } else {
+        _showError(result['error'] ?? 'Failed to update profile picture');
+        return false;
       }
-      return true;
-    } else {
-      _showError(result['error'] ?? 'Failed to update profile picture');
+    } catch (e) {
+      _showError('Error updating profile picture: $e');
       return false;
     }
-  } catch (e) {
-    print('Error updating profile picture: $e');
-    _showError('Error updating profile picture: $e');
-    return false;
   }
-}
 
+  // Flatten any nested list into a comma-separated string
+  /// Parses nested list-like structures coming either as actual List objects
+  /// or as Strings that look like bracketed lists (e.g. "[[MA]]") and returns
+  /// a comma-separated String like "MA, PhD".
+  String _parseNestedListField(dynamic fieldData) {
+    // Helper: split top-level comma-separated items inside a bracketed string.
+    List<String> _splitTopLevel(String s) {
+      final List<String> parts = [];
+      final sb = StringBuffer();
+      int bracket = 0;
+
+      for (int i = 0; i < s.length; i++) {
+        final ch = s[i];
+        if (ch == '[') {
+          bracket++;
+          sb.write(ch);
+        } else if (ch == ']') {
+          bracket--;
+          sb.write(ch);
+        } else if (ch == ',' && bracket == 0) {
+          parts.add(sb.toString());
+          sb.clear();
+        } else {
+          sb.write(ch);
+        }
+      }
+
+      if (sb.isNotEmpty) parts.add(sb.toString());
+      return parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    }
+
+    // Normalize single token: remove surrounding quotes if present, trim whitespace
+    String _normalizeToken(String token) {
+      var t = token.trim();
+      if ((t.startsWith('"') && t.endsWith('"')) ||
+          (t.startsWith("'") && t.endsWith("'"))) {
+        t = t.substring(1, t.length - 1);
+      }
+      return t;
+    }
+
+    // Recursive flatten function that handles Lists and Strings (including bracketed strings)
+    List<String> _flatten(dynamic data) {
+      if (data == null) return [];
+
+      // If it's already a List, recurse into each item
+      if (data is List) {
+        final List<String> out = [];
+        for (var item in data) {
+          out.addAll(_flatten(item));
+        }
+        return out;
+      }
+
+      // If it's a string that looks like a bracketed list "[...]", parse its contents
+      if (data is String) {
+        final s = data.trim();
+        if (s.startsWith('[') && s.endsWith(']')) {
+          // remove outer [ ]
+          final inner = s.substring(1, s.length - 1);
+          // split top-level items (handles nested brackets)
+          final parts = _splitTopLevel(inner);
+          final List<String> out = [];
+          for (var p in parts) {
+            // recursively flatten each part (in case of nested brackets)
+            out.addAll(_flatten(p));
+          }
+          return out;
+        }
+
+        // Plain string token (no brackets) — normalize and return
+        return [_normalizeToken(s)];
+      }
+
+      // Fallback: convert other value types to string
+      return [data.toString()];
+    }
+
+    try {
+      final flatList = _flatten(fieldData);
+      // remove empties and duplicates if you want:
+      final cleaned = flatList
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      print("Flattened qualifications: $cleaned"); // debug
+      return cleaned.join(', ');
+    } catch (e) {
+      print("Error flattening fieldData: $e");
+      return '';
+    }
+  }
 
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
@@ -194,18 +319,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Update profile picture first if selected
       bool pictureUpdated = false;
       if (_selectedImage != null) {
-        final pictureResult = await _updateProfilePicture();
-        if (pictureResult) {
-          pictureUpdated = true;
-        }
+        pictureUpdated = await _updateProfilePicture();
       }
 
-      print('Updating therapist profile...');
+      final backendAvailability = _generateBackendAvailability();
 
-      // Prepare data for profile update - using correct API field names
       final result = await _apiService.updateTherapistProfile(
         fullName: _fullNameController.text.trim().isEmpty
             ? null
@@ -231,29 +351,22 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         charge: _chargeController.text.trim().isEmpty
             ? null
             : _chargeController.text.trim(),
-        availability: _availabilityController.text.trim().isEmpty
+        availability: backendAvailability.isEmpty
             ? null
-            : _availabilityController.text.trim(),
+            : jsonEncode(backendAvailability),
         message: _messageController.text.trim().isEmpty
             ? null
             : _messageController.text.trim(),
       );
 
-      print('Profile update result: $result');
-
       if (result['success'] == true || pictureUpdated) {
         _showSuccess('Profile updated successfully');
-
-        // Wait a moment for the success message to show
         await Future.delayed(const Duration(seconds: 1));
-
-        // Go back to profile screen with refresh flag
-        Navigator.of(context).pop(true); // Return true to indicate success
+        Navigator.of(context).pop(true);
       } else {
         _showError(result['error'] ?? 'Failed to update profile');
       }
     } catch (e) {
-      print('Error updating profile: $e');
       _showError('Error updating profile: $e');
     } finally {
       setState(() => _isLoading = false);
@@ -297,9 +410,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     return Scaffold(
       backgroundColor: ColorConstants.colorF5F5F5,
       appBar: AppBar(
-        title: Text('Edit Profile'),
+        title: Text('Edit Profile', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.brown.shade600,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: Icon(Icons.arrow_back),
+          color: Colors.white,
+        ),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _updateProfile,
@@ -334,11 +452,137 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               SizedBox(height: 20),
               _buildProfessionalInfoSection(),
               SizedBox(height: 20),
+              _buildAvailabilitySection(),
+              SizedBox(height: 20),
               _buildAboutSection(),
               SizedBox(height: 32),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAvailabilitySection() {
+    return _buildSection('Availability', Icons.schedule, [
+      Text(
+        'Select your available time slots for each day',
+        style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+      ),
+      SizedBox(height: 16),
+      ..._availability.keys.map((day) => _buildDayAvailability(day)).toList(),
+    ]);
+  }
+
+  Widget _buildDayAvailability(String day) {
+    final daySlots = _timeSlotsByDay[day]!;
+    final selectedSlots = _availability[day]!;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                day,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: ColorConstants.primaryBrownColor,
+                ),
+              ),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _availability[day] = Set<String>.from(daySlots);
+                      });
+                    },
+                    child: Text('All', style: TextStyle(fontSize: 12)),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _availability[day]!.clear();
+                      });
+                    },
+                    child: Text(
+                      'Clear',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: daySlots.map((timeSlot) {
+              final isSelected = selectedSlots.contains(timeSlot);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _availability[day]!.remove(timeSlot);
+                    } else {
+                      _availability[day]!.add(timeSlot);
+                    }
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? ColorConstants.primaryBrownColor
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? ColorConstants.primaryBrownColor
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    timeSlot,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                      fontWeight: isSelected
+                          ? FontWeight.w500
+                          : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (selectedSlots.isNotEmpty) ...[
+            SizedBox(height: 8),
+            Text(
+              '${selectedSlots.length} slots selected',
+              style: TextStyle(
+                fontSize: 12,
+                color: ColorConstants.primaryBrownColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -377,13 +621,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       ? Image.network(
                           _currentProfilePicture!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Colors.grey.shade400,
-                            );
-                          },
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.person,
+                            size: 50,
+                            color: Colors.grey.shade400,
+                          ),
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return Center(
@@ -523,13 +765,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         hint: 'e.g., M.A. Psychology, Ph.D. Clinical Psychology',
         maxLines: 2,
         helperText: 'Separate multiple qualifications with commas',
-      ),
-      SizedBox(height: 16),
-      _buildTextField(
-        controller: _availabilityController,
-        label: 'Availability',
-        hint: 'e.g., Mon-Fri 9AM-6PM, Weekends by appointment',
-        maxLines: 2,
       ),
     ]);
   }
@@ -685,6 +920,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           onChanged: (String? newValue) {
             setState(() {
               controller.text = newValue ?? '';
+              _genderController.text = controller.text;
             });
           },
         ),
