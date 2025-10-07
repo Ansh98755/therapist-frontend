@@ -155,7 +155,7 @@ class CommunityProvider extends ChangeNotifier {
 
     _isLoading = true;
     notifyListeners();
-
+    
     try {
       if (reset) {
         print("🔄 Resetting posts and DB...");

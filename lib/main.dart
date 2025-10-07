@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:therapist_app/firebase/fcm/fcm_service.dart';
 import 'package:therapist_app/firebase/firebase_config.dart';
 import 'package:therapist_app/providers/bookings_provider.dart';
+import 'package:therapist_app/providers/community_provider.dart';
 import 'package:therapist_app/routes/app_routing.dart';
 import 'package:therapist_app/utils/color_constants/color_constants.dart';
 
@@ -40,6 +41,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => BookingsProvider()),
+        ChangeNotifierProvider(create: (_) => CommunityProvider()),
       ],
       child: const MyApp(),
     ),

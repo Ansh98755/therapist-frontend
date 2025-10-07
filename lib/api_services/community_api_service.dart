@@ -4,11 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/post_model.dart';
 import '../models/single_post_model.dart';
+
 class CommunityApiService {
   static const String _baseUrl = 'https://niti.nexuserp.co.in/api';
   static Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
+    final token = prefs.getString('auth_token') ?? '';
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
@@ -39,7 +40,9 @@ class CommunityApiService {
           .map((json) => PostModel.fromJson(json))
           .toList();
     } else {
-      print("Response body (for debugging): ${response.body}");   // <-- add this temporarily
+      print(
+        "Response body (for debugging): ${response.body}",
+      ); // <-- add this temporarily
       throw Exception('Failed to load posts: ${response.statusCode}');
     }
   }
