@@ -5,16 +5,33 @@ enum AppRouteEnum {
   authScreen(AppRouteName.authScreen, "/${AppRouteName.authScreen}"),
   homeScreen(AppRouteName.homeScreen, "/${AppRouteName.homeScreen}"),
   communityScreen(
-      AppRouteName.communityScreen, "/${AppRouteName.communityScreen}"),
-  communityReplyScreen(AppRouteName.communityReplyScreen,
-      "/${AppRouteName.communityReplyScreen}"),  newPostScreen(AppRouteName.newPostScreen, "/${AppRouteName.newPostScreen}"),
-  postDetailsScreen(AppRouteName.postDetailsScreen, "/${AppRouteName.postDetailsScreen}"),
+    AppRouteName.communityScreen,
+    "/${AppRouteName.communityScreen}",
+  ),
+  communityReplyScreen(
+    AppRouteName.communityReplyScreen,
+    "/${AppRouteName.communityReplyScreen}",
+  ),
+  newPostScreen(AppRouteName.newPostScreen, "/${AppRouteName.newPostScreen}"),
+  postDetailsScreen(
+    AppRouteName.postDetailsScreen,
+    "/${AppRouteName.postDetailsScreen}",
+  ),
   profileScreen(AppRouteName.profileScreen, "/${AppRouteName.profileScreen}"),
-  analyticsScreen(AppRouteName.analyticsScreen, "/${AppRouteName.analyticsScreen}"),
+  analyticsScreen(
+    AppRouteName.analyticsScreen,
+    "/${AppRouteName.analyticsScreen}",
+  ),
   loginScreen(AppRouteName.loginScreen, "/${AppRouteName.loginScreen}"),
-  forgotPasswordScreen(AppRouteName.forgotPasswordScreen, "/${AppRouteName.forgotPasswordScreen}"),
+  forgotPasswordScreen(
+    AppRouteName.forgotPasswordScreen,
+    "/${AppRouteName.forgotPasswordScreen}",
+  ),
   myPostScreen(AppRouteName.myPostScreen, "/${AppRouteName.myPostScreen}"),
-  notificationScreen(AppRouteName.notificationScreen, "/${AppRouteName.notificationScreen}");
+  notificationScreen(
+    AppRouteName.notificationScreen,
+    "/${AppRouteName.notificationScreen}",
+  );
 
   final String name;
   final String path;

@@ -27,10 +27,11 @@ class CommunityProvider extends ChangeNotifier {
   int getLikeCount(String postId) => _likeCounts[postId] ?? 0;
   bool isLiking(String postId) => _likingInProgress.contains(postId);
 
-  Future<void> toggleLikePost(
-      {required String postId,
-      required String token,
-      required String? postedBy}) async {
+  Future<void> toggleLikePost({
+    required String postId,
+    required String token,
+    required String? postedBy,
+  }) async {
     if (_likingInProgress.contains(postId)) return;
 
     _likingInProgress.add(postId);
@@ -53,16 +54,16 @@ class CommunityProvider extends ChangeNotifier {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(
-            {
-              'post_id': postId,
-              postedBy != null ? 'posted_by' : postedBy: '',
-              'user_name': userName
-            }),
+        body: jsonEncode({
+          'post_id': postId,
+          postedBy != null ? 'posted_by' : postedBy: '',
+          'user_name': userName,
+        }),
       );
 
       print(
-          '[DEBUG] Like toggle: $postId, isLikedNow: $isLikedNow, status: ${response.statusCode}');
+        '[DEBUG] Like toggle: $postId, isLikedNow: $isLikedNow, status: ${response.statusCode}',
+      );
       print('[DEBUG] Response body: ${response.body}');
 
       // Handle both 200 and 204 status codes as success
@@ -73,7 +74,8 @@ class CommunityProvider extends ChangeNotifier {
             (_likeCounts[postId] ?? 0) + (isLikedNow ? -1 : 1);
 
         print(
-            '[DEBUG] Successfully updated local state. New like state: ${_likedPosts[postId]}');
+          '[DEBUG] Successfully updated local state. New like state: ${_likedPosts[postId]}',
+        );
         print('[DEBUG] New like count: ${_likeCounts[postId]}');
 
         // Don't immediately refresh from backend to avoid race conditions
@@ -91,8 +93,11 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> getLikesForPosts(List<String> postIds, String token,
-      {bool forceUpdate = false}) async {
+  Future<void> getLikesForPosts(
+    List<String> postIds,
+    String token, {
+    bool forceUpdate = false,
+  }) async {
     try {
       final url = Uri.parse('https://niti.nexuserp.co.in/api/post/getLikes');
 
@@ -106,7 +111,8 @@ class CommunityProvider extends ChangeNotifier {
       );
 
       print(
-          '[DEBUG] getLikesForPosts response: ${response.statusCode} ${response.body}');
+        '[DEBUG] getLikesForPosts response: ${response.statusCode} ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -119,7 +125,8 @@ class CommunityProvider extends ChangeNotifier {
           final newLikedState = info['liked_by_user'] ?? false;
 
           print(
-              '[DEBUG] Post $postId - Backend: count=$newCount, liked=$newLikedState, Local: count=${_likeCounts[postId]}, liked=${_likedPosts[postId]}');
+            '[DEBUG] Post $postId - Backend: count=$newCount, liked=$newLikedState, Local: count=${_likeCounts[postId]}, liked=${_likedPosts[postId]}',
+          );
 
           // Always update count from backend
           _likeCounts[postId] = newCount;
@@ -130,10 +137,12 @@ class CommunityProvider extends ChangeNotifier {
           if (!_likedPosts.containsKey(postId) || forceUpdate) {
             _likedPosts[postId] = newLikedState;
             print(
-                '[DEBUG] Updated like state for post $postId to $newLikedState');
+              '[DEBUG] Updated like state for post $postId to $newLikedState',
+            );
           } else {
             print(
-                '[DEBUG] Preserved local like state for post $postId: ${_likedPosts[postId]}');
+              '[DEBUG] Preserved local like state for post $postId: ${_likedPosts[postId]}',
+            );
           }
         }
 
@@ -149,13 +158,14 @@ class CommunityProvider extends ChangeNotifier {
   Future<void> fetchPosts({bool reset = false, String? token}) async {
     if (_isLoading || (!_hasMore && !reset)) {
       print(
-          "⚠️ Skipping fetch: isLoading=$_isLoading, hasMore=$_hasMore, reset=$reset");
+        "⚠️ Skipping fetch: isLoading=$_isLoading, hasMore=$_hasMore, reset=$reset",
+      );
       return;
     }
 
     _isLoading = true;
     notifyListeners();
-    
+
     try {
       if (reset) {
         print("🔄 Resetting posts and DB...");
@@ -172,7 +182,8 @@ class CommunityProvider extends ChangeNotifier {
           _posts.addAll(cached);
           _page = (await CommunityPostDbHelper.getLastPage()) + 1;
           print(
-              "📦 Loaded ${cached.length} posts from DB (page restored: $_page)");
+            "📦 Loaded ${cached.length} posts from DB (page restored: $_page)",
+          );
           notifyListeners();
         } else {
           print("📭 No posts found in DB, will fetch from API...");
@@ -187,7 +198,8 @@ class CommunityProvider extends ChangeNotifier {
         print("🚫 No more posts from API (page $_page).");
       } else {
         print(
-            "🌐 Fetched ${fetchedPosts.length} posts from API (page $_page).");
+          "🌐 Fetched ${fetchedPosts.length} posts from API (page $_page).",
+        );
         _posts.addAll(fetchedPosts);
 
         // ✅ Save to DB

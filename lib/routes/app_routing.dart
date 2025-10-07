@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:therapist_app/screens/community_screen/community_screen.dart';
 import 'package:therapist_app/screens/home_screen/home_screen.dart';
+import 'package:therapist_app/screens/new_post_screen/new_post_screen.dart';
 import 'package:therapist_app/screens/profile_screen/profile_screen.dart';
 
 import '../custom_widgets/custom_bottom_navigation.dart';
@@ -59,45 +60,45 @@ abstract final class AppRouting {
             name: AppRouteEnum.profileScreen.name,
             builder: (context, state) => ProfileScreen(),
           ),
-              GoRoute(
-                path: AppRouteEnum.notificationScreen.path,
-                name: AppRouteEnum.notificationScreen.name,
-                builder: (context, state) => NotificationScreen(),
-              ),
-              GoRoute(
-                name: AppRouteEnum.myPostScreen.name,
-                path: AppRouteEnum.myPostScreen.path,
-                builder: (context, state) => MyPostScreen(),
-              ),
-              GoRoute(
-                path: AppRouteEnum.communityScreen.path,
-                name: AppRouteEnum.communityScreen.name,
-                builder: (context, state) => CommunityScreen(),
-              ),
-              GoRoute(
-                path: AppRouteEnum.communityReplyScreen.path,
-                name: AppRouteEnum.communityReplyScreen.name,
-                pageBuilder: (context, state) {
-                  // extract Map
-                  final args = state.extra as Map<String, dynamic>? ?? {};
-                  final postId = args['postId'] as String? ?? '';
-                  final postedById = args['postedById'] as String? ?? '';
+          GoRoute(
+            path: AppRouteEnum.notificationScreen.path,
+            name: AppRouteEnum.notificationScreen.name,
+            builder: (context, state) => NotificationScreen(),
+          ),
+          GoRoute(
+            name: AppRouteEnum.myPostScreen.name,
+            path: AppRouteEnum.myPostScreen.path,
+            builder: (context, state) => MyPostScreen(),
+          ),
+          GoRoute(
+            path: AppRouteEnum.communityScreen.path,
+            name: AppRouteEnum.communityScreen.name,
+            builder: (context, state) => CommunityScreen(),
+          ),
+          GoRoute(
+            path: AppRouteEnum.communityReplyScreen.path,
+            name: AppRouteEnum.communityReplyScreen.name,
+            pageBuilder: (context, state) {
+              // extract Map
+              final args = state.extra as Map<String, dynamic>? ?? {};
+              final postId = args['postId'] as String? ?? '';
+              final postedById = args['postedById'] as String? ?? '';
 
-                  return CustomTransitionPage(
-                    transitionDuration: const Duration(milliseconds: 400),
-                    child: RepliesScreen(
-                      postId: postId,
-                      postedById: postedById,
-                    ),
-                    transitionsBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                      final offsetAnimation = Tween<Offset>(
-                        begin: const Offset(1.0, 0.0),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeInOut,
-                      ));
+              return CustomTransitionPage(
+                transitionDuration: const Duration(milliseconds: 400),
+                child: RepliesScreen(postId: postId, postedById: postedById),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      final offsetAnimation =
+                          Tween<Offset>(
+                            begin: const Offset(1.0, 0.0),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeInOut,
+                            ),
+                          );
 
                       final fadeAnimation = Tween<double>(
                         begin: 0.0,
@@ -112,51 +113,52 @@ abstract final class AppRouting {
                         ),
                       );
                     },
-                  );
-                },
-              ),
-              /// Post Details
-              // GoRoute(
-              //   path: AppRouteEnum.postDetailsScreen.path,
-              //   name: AppRouteEnum.postDetailsScreen.name,
-              //   pageBuilder: (context, state) {
-              //     final post = state.extra;
-              //     if (post is CommunityPost) {
-              //       return CustomTransitionPage(
-              //         child: PostDetailsScreen(post: post),
-              //         transitionDuration: const Duration(milliseconds: 400),
-              //         transitionsBuilder:
-              //             (context, animation, secondaryAnimation, child) {
-              //           final offsetAnimation = Tween<Offset>(
-              //             begin: const Offset(1.0, 0.0),
-              //             end: Offset.zero,
-              //           ).animate(CurvedAnimation(
-              //             parent: animation,
-              //             curve: Curves.easeInOut,
-              //           ));
-              //
-              //           final fadeAnimation = Tween<double>(
-              //             begin: 0.0,
-              //             end: 1.0,
-              //           ).animate(animation);
-              //
-              //           return SlideTransition(
-              //             position: offsetAnimation,
-              //             child: FadeTransition(
-              //               opacity: fadeAnimation,
-              //               child: child,
-              //             ),
-              //           );
-              //         },
-              //       );
-              //     }
-              //     return const MaterialPage(
-              //       child: Scaffold(
-              //         body: Center(child: Text('Invalid post data')),
-              //       ),
-              //     );
-              //   },
-              // ),
+              );
+            },
+          ),
+
+          /// Post Details
+          // GoRoute(
+          //   path: AppRouteEnum.postDetailsScreen.path,
+          //   name: AppRouteEnum.postDetailsScreen.name,
+          //   pageBuilder: (context, state) {
+          //     final post = state.extra;
+          //     if (post is CommunityPost) {
+          //       return CustomTransitionPage(
+          //         child: PostDetailsScreen(post: post),
+          //         transitionDuration: const Duration(milliseconds: 400),
+          //         transitionsBuilder:
+          //             (context, animation, secondaryAnimation, child) {
+          //           final offsetAnimation = Tween<Offset>(
+          //             begin: const Offset(1.0, 0.0),
+          //             end: Offset.zero,
+          //           ).animate(CurvedAnimation(
+          //             parent: animation,
+          //             curve: Curves.easeInOut,
+          //           ));
+          //
+          //           final fadeAnimation = Tween<double>(
+          //             begin: 0.0,
+          //             end: 1.0,
+          //           ).animate(animation);
+          //
+          //           return SlideTransition(
+          //             position: offsetAnimation,
+          //             child: FadeTransition(
+          //               opacity: fadeAnimation,
+          //               child: child,
+          //             ),
+          //           );
+          //         },
+          //       );
+          //     }
+          //     return const MaterialPage(
+          //       child: Scaffold(
+          //         body: Center(child: Text('Invalid post data')),
+          //       ),
+          //     );
+          //   },
+          // ),
         ],
       ),
 
@@ -165,6 +167,11 @@ abstract final class AppRouting {
         path: AppRouteEnum.forgotPasswordScreen.path,
         name: AppRouteEnum.forgotPasswordScreen.name,
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRouteEnum.newPostScreen.path,
+        name: AppRouteEnum.newPostScreen.name,
+        builder: (context, state) => const NewPostScreen(),
       ),
     ],
 
