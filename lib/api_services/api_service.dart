@@ -432,110 +432,6 @@ class ApiService {
     }
   }
 
-  // Future<Map<String, dynamic>> updateTherapistProfile({
-  //   String? fullName,
-  //   String? gender,
-  //   String? meetLink,
-  //   String? experience,
-  //   String? expertise,
-  //   String? languages,
-  //   String? qualifications,
-  //   String? charge,
-  //   String? availability,
-  //   String? message,
-  // }) async {
-  //   try {
-  //     final therapistId = await _authService.getTherapistId();
-  //     if (therapistId == null || therapistId.isEmpty) {
-  //       return {'success': false, 'error': 'Therapist ID not found'};
-  //     }
-
-  //     print('Updating therapist profile for ID: $therapistId');
-
-  //     final requestBody = <String, dynamic>{
-  //       'therapistId': therapistId, // ADD THIS - most likely missing!
-  //     };
-
-  //     // Map frontend field names to backend API field names
-  //     if (fullName != null && fullName.isNotEmpty) {
-  //       requestBody['fullname'] =
-  //           fullName; // API uses 'fullname' not 'fullName'
-  //     }
-  //     if (gender != null && gender.isNotEmpty) {
-  //       requestBody['gender'] = gender;
-  //     }
-  //     if (meetLink != null && meetLink.isNotEmpty) {
-  //       requestBody['meetLink'] = meetLink;
-  //     }
-  //     if (experience != null && experience.isNotEmpty) {
-  //       // Convert to number if possible
-  //       try {
-  //         requestBody['experience'] = int.parse(experience);
-  //       } catch (e) {
-  //         requestBody['experience'] = experience;
-  //       }
-  //     }
-  //     if (expertise != null && expertise.isNotEmpty) {
-  //       // Convert comma-separated string to array if needed by API
-  //       if (expertise.contains(',')) {
-  //         requestBody['expertise'] = expertise
-  //             .split(',')
-  //             .map((e) => e.trim())
-  //             .where((e) => e.isNotEmpty)
-  //             .toList();
-  //       } else {
-  //         requestBody['expertise'] = [expertise.trim()];
-  //       }
-  //     }
-  //     if (languages != null && languages.isNotEmpty) {
-  //       // Convert comma-separated string to array if needed by API
-  //       if (languages.contains(',')) {
-  //         requestBody['languages'] = languages
-  //             .split(',')
-  //             .map((e) => e.trim())
-  //             .where((e) => e.isNotEmpty)
-  //             .toList();
-  //       } else {
-  //         requestBody['languages'] = [languages.trim()];
-  //       }
-  //     }
-  //     if (qualifications != null && qualifications.isNotEmpty) {
-  //       requestBody['qualifications'] = qualifications;
-  //     }
-  //     if (charge != null && charge.isNotEmpty) {
-  //       // Convert to number if possible
-  //       try {
-  //         requestBody['charge'] = int.parse(charge);
-  //       } catch (e) {
-  //         requestBody['charge'] = charge;
-  //       }
-  //     }
-  //     if (availability != null && availability.isNotEmpty) {
-  //       requestBody['availability'] = availability;
-  //     }
-  //     if (message != null && message.isNotEmpty) {
-  //       requestBody['message'] = message;
-  //     }
-
-  //     print('Update profile request body: $requestBody');
-
-  //     final response = await http
-  //         .post(
-  //           Uri.parse('$baseUrl/updateTherapistProfile'),
-  //           headers: await _getHeaders(),
-  //           body: json.encode(requestBody),
-  //         )
-  //         .timeout(const Duration(seconds: 30));
-
-  //     print('Update profile response status: ${response.statusCode}');
-  //     print('Update profile response body: ${response.body}');
-
-  //     return _handleResponse(response);
-  //   } catch (e) {
-  //     print('Update therapist profile error: $e');
-  //     return {'success': false, 'error': _getErrorMessage(e)};
-  //   }
-  // }
 
   Future<Map<String, dynamic>> updateTherapistProfile({
     String? fullName,
@@ -559,7 +455,6 @@ class ApiService {
 
       final requestBody = <String, dynamic>{'therapistId': therapistId};
 
-      // Map frontend field names to backend API field names
       if (fullName != null && fullName.isNotEmpty) {
         requestBody['fullname'] = fullName;
       }

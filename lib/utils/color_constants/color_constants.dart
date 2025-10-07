@@ -12,6 +12,7 @@ abstract final class ColorConstants {
   static const Color blueColor = Colors.blue;
   static const Color blackColor = Colors.black;
   static const Color redColor = Colors.red;
+  static const Color redColor2 = Color(0xFFEF9A9A);
   static const Color colorE6DBCD = Color(0xFFE6DBCD);
   static const Color colorEFE5DA = Color(0xFFEFE5DA);
   static const Color colorE6DBCF = Color(0xFFE6DBCF);

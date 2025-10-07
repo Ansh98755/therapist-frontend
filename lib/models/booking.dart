@@ -1,25 +1,34 @@
 class Customer {
+  final String id;
   final String name;
   final String phone;
-  final String id;
 
-  Customer({required this.name, required this.phone, required this.id});
+  Customer({required this.id, required this.name, required this.phone});
 
-  factory Customer.fromJson(Map<String, dynamic> json) {
-    return Customer(
-      name: json['name'] ?? '',
-      phone: json['phone'] ?? '',
-      id: json['id'].toString(),
-    );
+  factory Customer.fromJson(dynamic json) {
+    if (json == null) {
+      return Customer(id: '', name: 'Unknown Client', phone: '');
+    }
+
+    if (json is String) {
+      // If API provides just an ID as a string sometimes
+      return Customer(id: json, name: 'Unknown Client', phone: '');
+    }
+
+    final id = json['_id']?.toString() ?? '';
+    final name = json['fullName'] ?? 'Unknown Client';
+    final phone = json['phoneNumber'] ?? '';
+
+    return Customer(id: id, name: name, phone: phone);
   }
 }
 
 class Booking {
   final String id;
   final Customer customer;
-  final String type;
+  final String type; // e.g. 'Booked', 'Rescheduled'
   final String status;
-  final String price;
+  final String charge;
   final String duration;
   final DateTime? meetDateTime;
   final String displayDate;
@@ -34,7 +43,7 @@ class Booking {
     required this.customer,
     required this.type,
     required this.status,
-    required this.price,
+    required this.charge,
     required this.duration,
     this.meetDateTime,
     required this.displayDate,
@@ -46,40 +55,36 @@ class Booking {
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
-    // No customer object, so fallback to "Unknown"
-    final customer = Customer(
-      name: 'Unknown Client',
-      phone: '',
-      id: json['customerId']?.toString() ?? '',
-    );
-
-    DateTime? parseDateTime(String? value) {
-      if (value == null || value.isEmpty) return null;
-      return DateTime.tryParse(value);
+    DateTime? parseDateTime(String? dateStr) {
+      if (dateStr == null || dateStr.isEmpty) return null;
+      return DateTime.tryParse(dateStr);
     }
 
     String formatDate(String? dateStr) {
       if (dateStr == null) return '';
       try {
-        final date = DateTime.parse(dateStr);
-        return '${date.day}/${date.month}/${date.year}';
+        final dt = DateTime.parse(dateStr);
+        return '${dt.day}/${dt.month}/${dt.year}';
       } catch (_) {
         return '';
       }
     }
+
+    final customerJson = json['customerId'];
+    final customer = Customer.fromJson(customerJson);
 
     return Booking(
       id: json['_id'].toString(),
       customer: customer,
       type: json['meetStatus'] ?? '',
       status: (json['meetStatus'] ?? '').toString().toLowerCase(),
-      price: '',
-      duration: '',
+      charge: json['charge']?.toString() ?? '',
+      duration: '', // no duration info
       meetDateTime: parseDateTime(json['meetDate']),
       displayDate: formatDate(json['meetDate']),
       time: json['meetTime'] ?? '',
       finished: json['finished'] ?? false,
-      notes: '',
+      notes: '', // no notes info
       link: json['meetLink'] ?? '',
       createdAt: parseDateTime(json['createdAt']),
     );

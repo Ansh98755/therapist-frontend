@@ -1,5 +1,3 @@
-import 'dart:convert' show json;
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:therapist_app/api_services/api_service.dart';
@@ -61,8 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           throw Exception('Unexpected data format');
         }
 
-        // Process and normalize the data according to actual API response structure
         final processedData = _processProfileData(extractedData);
+        print('${processedData['fullname']}');
         await SharedPrefService().saveFullName(processedData['fullname'] ?? '');
         setState(() {
           profileData = processedData;

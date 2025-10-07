@@ -27,7 +27,7 @@ Color getStatusTextColor(String status) {
     case 'pending':
       return ColorConstants.colorF7921E;
     case 'cancelled':
-      return ColorConstants.redColor;
+      return ColorConstants.whiteColor2;
     case 'completed':
       return ColorConstants.primaryBrownColor;
     default:

@@ -87,7 +87,7 @@ class BookingDetailDialog extends StatelessWidget {
                 _buildDetailRow('Time', booking.time),
                 _buildDetailRow('Type', booking.type),
                 _buildDetailRow('Duration', booking.duration),
-                _buildDetailRow('Fee', '₹${booking.price}'),
+                _buildDetailRow('Fee', '₹${booking.charge}'),
                 _buildDetailRow('Status', booking.status),
                 if (booking.createdAt != null)
                   _buildDetailRow(

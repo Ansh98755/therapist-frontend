@@ -8,13 +8,15 @@ class BookingService {
     final result = await _apiService.getBookings();
 
     if (result['success'] == true) {
-      final data = result['data'];
-      List bookingsArray = [];
+      final parsedData = result['data'];
+      List<dynamic> bookingsArray = [];
 
-      if (data is Map<String, dynamic>) {
-        bookingsArray = data['data'] ?? data['bookings'] ?? data['results'] ?? [];
-      } else if (data is List) {
-        bookingsArray = data;
+      // Your API response includes 'data' with 'data' array inside it OR just an array
+      if (parsedData is Map<String, dynamic>) {
+        // If your ApiService returns entire parsed response inside 'data' key
+        bookingsArray = parsedData['data'] ?? [];
+      } else if (parsedData is List) {
+        bookingsArray = parsedData;
       }
 
       return bookingsArray

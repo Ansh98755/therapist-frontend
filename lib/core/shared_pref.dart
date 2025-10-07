@@ -72,8 +72,8 @@ class SharedPrefService {
 
   // === New methods for therapist full name ===
 
-  Future<void> saveFullName(String fullName) async {
-    await setString(_fullNameKey, fullName);
+  Future<void> saveFullName(String fullname) async {
+    await setString(_fullNameKey, fullname);
   }
 
   Future<String?> getFullName() async {

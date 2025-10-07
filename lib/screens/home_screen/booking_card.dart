@@ -7,7 +7,6 @@ class BookingCard extends StatelessWidget {
   final Booking booking;
   final VoidCallback? onTap;
   final VoidCallback? onJoinMeeting;
-
   const BookingCard({
     Key? key,
     required this.booking,
@@ -17,6 +16,9 @@ class BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final customerName = booking.customer.name.isNotEmpty
+        ? booking.customer.name
+        : 'Client';
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -131,9 +133,9 @@ class BookingCard extends StatelessWidget {
                   children: [
                     Icon(Icons.currency_rupee,
                         size: 16, color: ColorConstants.color666666),
-                    SizedBox(width: 8),
+                    SizedBox(width: 6),
                     Text(
-                      '${booking.price}',
+                      '${booking.charge.isNotEmpty ? booking.charge : '0'}',
                       style: TextStyle(
                         fontSize: 14,
                         color: ColorConstants.blackColor.withOpacity(0.7),

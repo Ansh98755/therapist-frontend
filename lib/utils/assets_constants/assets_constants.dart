@@ -1,0 +1,35 @@
+abstract final class AssetsConstants {
+  static const appLogo = "assets/images/appLogo.png";
+  static const getStarted = "assets/images/get_started.png";
+  static const nitiLogo = "assets/images/niti_logo.png";
+  static const menuIcon = "assets/images/menuIcon.png";
+  static const odraLogo = "assets/images/odra_logo.png";
+  static const topBarColor = "assets/images/top_bar_color.png";
+  static const settingsBack = "assets/images/settings_back.png";
+  static const settingsSearch = "assets/images/settings_search.png";
+  static const settingsProfile = "assets/images/settings_profile.png";
+  static const settingsNotification = "assets/images/settings_notification.png";
+  static const settingsRightArrow = "assets/images/settings_r_arrow.png";
+  static const settingsMode = "assets/images/settings_mode.png";
+  static const settingsLang = "assets/images/settings_lang.png";
+  static const settingsCommunity = "assets/images/settings_community.png";
+  static const settingsPrivacy = "assets/images/settings_privacy.png";
+  static const settingsTerms = "assets/images/settings_terms.png";
+  static const settingsContact = "assets/images/settings_contact.png";
+  static const settingsHelp = "assets/images/settings_help.png";
+  static const postCloseBtn = "assets/images/post_close_btn.png";
+  static const communityAnony = "assets/images/community_anony.png";
+  static const mediaIcon = "assets/images/media_icon.png";
+  static const reply1 = "assets/images/reply_1.png";
+  static const reply2 = "assets/images/reply_2.png";
+  static const reply4 = "assets/images/reply_4.png";
+  static const communityChat = "assets/images/community_chat.png";
+  static const blurLadyPhoto = 'assets/images/blur_lady_photo.png';
+  static const doctor = 'assets/images/doctor.png';
+  static const doctor2 = 'assets/images/doctor2.png';
+  static const indravLogo = 'assets/images/indrav_logo.png';
+  static const slide2 = 'assets/images/therapy1.jpg';
+  static const slide1= 'assets/images/home_background.jpg';
+  static const slide3 = 'assets/images/therapy3.jpg';
+  static const homeScreenBackground = 'assets/images/home_background.jpg';
+}
