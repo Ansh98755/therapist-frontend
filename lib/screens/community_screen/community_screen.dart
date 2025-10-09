@@ -48,7 +48,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
           await provider.fetchPosts(reset: true, token: token);
         } else {
           print(
-              "🟡 Returning user: Showing ${provider.posts.length} posts from Provider (no API call).");
+            "🟡 Returning user: Showing ${provider.posts.length} posts from Provider (no API call).",
+          );
         }
       } else {
         print("🔒 No token found → skipping fetch.");
@@ -76,8 +77,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
   // Add pull-to-refresh functionality
   Future<void> _onRefresh() async {
     if (_token != null) {
-      await Provider.of<CommunityProvider>(context, listen: false)
-          .fetchPosts(reset: true, token: _token!);
+      await Provider.of<CommunityProvider>(
+        context,
+        listen: false,
+      ).fetchPosts(reset: true, token: _token!);
     }
   }
 
@@ -132,8 +135,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
   Future<List<Map<String, dynamic>>> fetchCommentsForPost(String postId) async {
     try {
       final token = await SharedPrefService().getToken();
-      final url =
-          Uri.parse('https://niti.nexuserp.co.in/api/post/getComments/$postId');
+      final url = Uri.parse(
+        'https://niti.nexuserp.co.in/api/post/getComments/$postId',
+      );
       final response = await http.post(
         url,
         headers: {
@@ -154,8 +158,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
     return [];
   }
 
-  void openCommentsSheet(String postId, String postTitle,
-      {String userID = ''}) async {
+  void openCommentsSheet(
+    String postId,
+    String postTitle, {
+    String userID = '',
+  }) async {
     final comments = await fetchCommentsForPost(postId);
     if (!mounted) return;
 
@@ -168,7 +175,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
           create: (_) => RepliesProvider(),
           child: Padding(
             padding: EdgeInsets.only(
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            ),
             child: DraggableScrollableSheet(
               initialChildSize: 0.75,
               minChildSize: 0.35,
@@ -178,8 +186,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 return Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
                   child: Column(
@@ -189,8 +198,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         height: 4,
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(10)),
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       Text(
                         "Comments on '$postTitle'",
@@ -202,7 +212,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       const Divider(),
                       if (comments.isEmpty)
                         const Expanded(
-                            child: Center(child: Text("No comments yet")))
+                          child: Center(child: Text("No comments yet")),
+                        )
                       else
                         Expanded(
                           child: ListView.builder(
@@ -218,7 +229,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 comment: comment,
                                 onSend: (replyText, commentMap) async {
                                   debugPrint(
-                                      'Reply for ${commentMap['_id']}: $replyText');
+                                    'Reply for ${commentMap['_id']}: $replyText',
+                                  );
                                 },
                                 userId: userID,
                               );
@@ -238,12 +250,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: ColorConstants.whiteColor2,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: ColorConstants.whiteColor2,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: ColorConstants.whiteColor2,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: ColorConstants.whiteColor2,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
     return SafeArea(
       child: Scaffold(
         floatingActionButton: Padding(
@@ -259,8 +273,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ),
             label: Text(
               "Share your thoughts",
-              style: TextStyleConstants.inter14W600
-                  .copyWith(color: ColorConstants.whiteColor2),
+              style: TextStyleConstants.inter14W600.copyWith(
+                color: ColorConstants.whiteColor2,
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: ColorConstants.primaryBrownColor,
@@ -281,6 +296,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
           elevation: 0,
           // centerTitle: true,
           backgroundColor: ColorConstants.whiteColor2,
+<<<<<<< HEAD
+=======
+
+>>>>>>> d0dfb253bff71cb90c6ef9ab7f09e2dc9c320720
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 20),
@@ -333,8 +352,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               _notificationCount > 99
                                   ? "99+"
                                   : '$_notificationCount',
-                              style: TextStyleConstants.inter12W500
-                                  .copyWith(color: ColorConstants.whiteColor2),
+                              style: TextStyleConstants.inter12W500.copyWith(
+                                color: ColorConstants.whiteColor2,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -347,67 +367,77 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ],
           title: Padding(
             padding: const EdgeInsets.only(right: 48.0),
-            child: Text(StringConstants.community,
-                style: TextStyleConstants.inter20W600
-                    .copyWith(color: ColorConstants.blackColor)),
+            child: Text(
+              StringConstants.community,
+              style: TextStyleConstants.inter20W600.copyWith(
+                color: ColorConstants.blackColor,
+              ),
+            ),
           ),
         ),
-        body: Stack(children: [
-          Positioned(
-            top: 50,
-            left: 50,
-            child: Opacity(
-              opacity: 0.2,
-              child: Image.asset('assets/images/background_sticker2.png',
-                  width: 180),
+        body: Stack(
+          children: [
+            Positioned(
+              top: 50,
+              left: 50,
+              child: Opacity(
+                opacity: 0.2,
+                child: Image.asset(
+                  'assets/images/background_sticker2.png',
+                  width: 180,
+                ),
+              ),
             ),
-          ),
-          Positioned(
-            bottom: 50,
-            right: 50,
-            child: Opacity(
-              opacity: 0.2,
-              child: Image.asset('assets/images/background_sticker1.png',
-                  width: 100),
+            Positioned(
+              bottom: 50,
+              right: 50,
+              child: Opacity(
+                opacity: 0.2,
+                child: Image.asset(
+                  'assets/images/background_sticker1.png',
+                  width: 100,
+                ),
+              ),
             ),
-          ),
-          Consumer<CommunityProvider>(
-            builder: (context, provider, _) {
-              if (provider.posts.isEmpty && provider.isLoading) {
-                // return const Center(child: CircularProgressIndicator());
-                return const SkeletonCommunityScreen();
-              }
+            // Posts list
+            Consumer<CommunityProvider>(
+              builder: (context, provider, _) {
+                // Show skeleton if loading first time and no posts
+                if (provider.posts.isEmpty && provider.isLoading) {
+                  return const SkeletonCommunityScreen();
+                }
 
-              return RefreshIndicator(
-                onRefresh: _onRefresh,
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  controller: _scrollController,
+                return RefreshIndicator(
+                  onRefresh: _onRefresh,
                   child: ListView.builder(
+                    physics: AlwaysScrollableScrollPhysics(),
                     controller: _scrollController,
-                    itemCount: provider.posts.length +
-                        (provider.hasReachedEnd ? 0 : 1),
+                    padding: const EdgeInsets.only(
+                      bottom: 100,
+                    ), // Safe space for FAB
+                    itemCount:
+                        provider.posts.length + (provider.isLoading ? 1 : 0),
                     itemBuilder: (context, index) {
+                      // Show loader at the end of the list
                       if (index == provider.posts.length) {
                         return Padding(
-                          padding: EdgeInsets.all(16),
-                          child: SizedBox(
-                            height: 300,
-                            // child: SkeletonCommunityScreen(),
-                            child: Center(child: CircularProgressIndicator()),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 3),
+                            ),
                           ),
-                          // Center(child: CircularProgressIndicator()),
                         );
                       }
 
                       final post = provider.posts[index];
-                      final postId = post.id ?? '';
-                      print('Rendering post at index $index with ID $postId');
 
                       return _CommunityPost(
                         postId: post.id,
-                        title: post.title, // <-- use title
-                        content: post.body, // <-- use body
+                        title: post.title,
+                        content: post.body,
                         name: post.postedBy?.fullName ?? "Anonymous",
                         createdById: post.postedBy?.id,
                         timeAgo: timeAgoSinceDate(post.createdAt),
@@ -416,24 +446,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         anonymous: post.anonymous,
                         postedById: post.postedBy?.id,
                       );
-
-                      //     name: post.title,
-                      //     timeAgo: timeAgoSinceDate(post.createdAt),
-                      //     content: post.body,
-                      //     commentsCount: "3",
-                      //     onChatTap: () {
-                      //       context
-                      //           .pushNamed(AppRouteEnum.communityReplyScreen.name);
-                      //     },
-                      //     createdBy: post.createdBy);
-                      // // post.createdBy?.fullName);
                     },
                   ),
-                ),
-              );
-            },
-          ),
-        ]),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -534,7 +553,10 @@ class _CommunityPostState extends State<_CommunityPost> {
     final provider = Provider.of<CommunityProvider>(context, listen: false);
 
     await provider.toggleLikePost(
-        postId: widget.postId, postedBy: widget.postedById, token: _token!);
+      postId: widget.postId,
+      postedBy: widget.postedById,
+      token: _token!,
+    );
   }
 
   @override
@@ -582,16 +604,18 @@ class _CommunityPostState extends State<_CommunityPost> {
                       children: [
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final textStyle =
-                                TextStyleConstants.inter14W600.copyWith(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: ColorConstants.primaryBrownColor,
-                            );
+                            final textStyle = TextStyleConstants.inter14W600
+                                .copyWith(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: ColorConstants.primaryBrownColor,
+                                );
 
                             final tp = TextPainter(
                               text: TextSpan(
-                                  text: widget.title, style: textStyle),
+                                text: widget.title,
+                                style: textStyle,
+                              ),
                               maxLines: 1, // important
                               textDirection: TextDirection.ltr,
                             )..layout(maxWidth: constraints.maxWidth);
@@ -612,15 +636,16 @@ class _CommunityPostState extends State<_CommunityPost> {
                                 if (isOverflowing)
                                   GestureDetector(
                                     onTap: () => setState(
-                                        () => isExpanded = !isExpanded),
+                                      () => isExpanded = !isExpanded,
+                                    ),
                                     child: Padding(
                                       padding: const EdgeInsets.only(top: 2),
                                       child: Text(
                                         isExpanded ? "Show less" : "Show more",
                                         style: TextStyleConstants.inter12W600
                                             .copyWith(
-                                          color: Colors.blue.shade600,
-                                        ),
+                                              color: Colors.blue.shade600,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -648,8 +673,9 @@ class _CommunityPostState extends State<_CommunityPost> {
               child: Text(
                 widget.content,
                 maxLines: _isExpanded ? null : 5,
-                overflow:
-                    _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                overflow: _isExpanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
                 style: TextStyleConstants.inter12W500.copyWith(
                   fontSize: 15.5,
                   height: 1.55,
@@ -693,17 +719,22 @@ class _CommunityPostState extends State<_CommunityPost> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
+                              color: isLiked
+                                  ? Colors.red.shade50
+                                  : Colors.red.shade50.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
                                 color: isLiked
-                                    ? Colors.red.shade50
-                                    : Colors.red.shade50.withOpacity(0.4),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                    color: isLiked
-                                        ? Colors.white
-                                        : ColorConstants.themeColor
-                                            .withOpacity(0.3))),
+                                    ? Colors.white
+                                    : ColorConstants.themeColor.withOpacity(
+                                        0.3,
+                                      ),
+                              ),
+                            ),
                             child: Row(
                               children: [
                                 isLiked
@@ -720,10 +751,10 @@ class _CommunityPostState extends State<_CommunityPost> {
                                 const SizedBox(width: 6),
                                 Text(
                                   likeCount.toString(),
-                                  style:
-                                      TextStyleConstants.inter14W600.copyWith(
-                                    color: ColorConstants.hintColor,
-                                  ),
+                                  style: TextStyleConstants.inter14W600
+                                      .copyWith(
+                                        color: ColorConstants.hintColor,
+                                      ),
                                 ),
                               ],
                             ),
@@ -751,13 +782,16 @@ class _CommunityPostState extends State<_CommunityPost> {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                              color: Colors.red.shade50.withOpacity(0.4),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: ColorConstants.themeColor
-                                      .withOpacity(0.3))),
+                            color: Colors.red.shade50.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: ColorConstants.themeColor.withOpacity(0.3),
+                            ),
+                          ),
                           child: Row(
                             children: [
                               Image.asset(
