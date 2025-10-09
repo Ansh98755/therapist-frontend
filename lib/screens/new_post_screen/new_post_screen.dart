@@ -189,20 +189,27 @@ class _NewPostScreenState extends State<NewPostScreen> {
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.only(left: 16),
-                                child: TextField(
-                                  controller: _titleController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Enter title (max 20 words)',
-                                    hintStyle: TextStyleConstants.inter14W400
-                                        .copyWith(
-                                          color: ColorConstants.hintColor,
-                                        ),
-                                    border: InputBorder.none,
+                                child: Theme(
+                                  data: Theme.of(context).copyWith(
+                                    inputDecorationTheme: const InputDecorationTheme(
+                                      border: InputBorder.none,
+                                    ),
                                   ),
-                                  style: TextStyleConstants.inter16W500
-                                      .copyWith(
-                                        color: ColorConstants.blackColor,
-                                      ),
+                                  child: TextField(
+                                    controller: _titleController,
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter title (max 20 words)',
+                                      hintStyle: TextStyleConstants.inter14W400
+                                          .copyWith(
+                                            color: ColorConstants.hintColor,
+                                          ),
+                                      border: InputBorder.none,
+                                    ),
+                                    style: TextStyleConstants.inter16W500
+                                        .copyWith(
+                                          color: ColorConstants.blackColor,
+                                        ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -217,19 +224,27 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                 ),
                               ),
                               padding: const EdgeInsets.all(16),
-                              child: TextField(
-                                controller: _bodyController,
-                                maxLines: null,
-                                keyboardType: TextInputType.multiline,
-                                decoration: InputDecoration.collapsed(
-                                  hintText: StringConstants.postTextHint,
-                                  hintStyle: TextStyleConstants.inter14W400
-                                      .copyWith(
-                                        color: ColorConstants.hintColor,
-                                      ),
+                              child: Theme(
+                                data: Theme.of(context).copyWith(
+                                  inputDecorationTheme: const InputDecorationTheme(
+                                    border: InputBorder.none,
+                                  ),
                                 ),
-                                style: TextStyleConstants.inter16W500.copyWith(
-                                  color: ColorConstants.blackColor,
+                                child: TextField(
+                                  controller: _bodyController,
+                                  maxLines: null,
+                                  keyboardType: TextInputType.multiline,
+                                  decoration: InputDecoration.collapsed(
+                                    hintText: StringConstants.postTextHint,
+                                    hintStyle: TextStyleConstants.inter14W400
+                                        .copyWith(
+                                          color: ColorConstants.hintColor,
+                                        ),
+                                    border: InputBorder.none
+                                  ),
+                                  style: TextStyleConstants.inter16W500.copyWith(
+                                    color: ColorConstants.blackColor,
+                                  ),
                                 ),
                               ),
                             ),

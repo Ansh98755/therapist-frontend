@@ -281,10 +281,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
           elevation: 0,
           // centerTitle: true,
           backgroundColor: ColorConstants.whiteColor2,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.black87, size: 24),
-            onPressed: () => Navigator.pop(context),
-          ),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 20),
